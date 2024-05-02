@@ -2907,6 +2907,7 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	EXIT
 
 ; -----------------------------------------------------------------------------
+;
 ;	(WARM)
 ;
 ;	> A routine which returns control to the
@@ -2966,7 +2967,21 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	PWARM
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	ESCAPE
+;
+;	> Prints the message 'Escape' and re-enters
+;	> the system via QUIT. This is the routine executed when
+;	> the ESCAPE key is pressed.
+;
+;	: ESCAPE
+;	 SP!
+;	 CR ." Escape"
+;	 QUIT
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L9421	DEFWORD	"ESCAPE"
 	EQUW	LA04F-REL
@@ -2978,7 +2993,30 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	QUIT
 	EQUW	EXIT
 
+;-----------------------------------------------------------------------------
+;
 ;	OSERROR
+;
+;	> The routine executed when an operating
+;	> system error is detected. The error message number is
+;	> given in decimal base and the relevant operating system
+;	> error message is displayed. Controls is returned to the
+;	> keyboard via (WARM).
+;
+;	: OSERROR
+;	 SP!
+;	 CR ." O.S.Error "   $00FD @   DUP C@ DEC.
+;	 0 CLOSE
+;	 SPACE   BEGIN
+;	          1+ DUP C@
+;	         WHILE
+;	          EMIT
+;	         REPEAT
+;	 2DROP
+;	 (WARM)
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L943D	DEFWORD	"OSERROR"
 	EQUW	L9421

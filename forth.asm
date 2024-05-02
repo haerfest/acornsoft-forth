@@ -219,60 +219,78 @@ ORIG	=	*		; FORTH ORIGIN
 
 	EQUB	"RdeG-H"	; AUTHOR ?
 
-.L812A	EQUW	L9501
-.L812C	EQUW	ESCAPE+2
-.L812E	EQUW	OSERR+2
+.L812A	EQUW	L9501		; BRK HANDLER
+.L812C	EQUW	ESCAPE+2	; ESCAPE HANDLER
+.L812E	EQUW	OSERR+2		; OSERROR HANDLER
 
-.L8130	LDA	L8110+1
+; -----------------------------------------------------------------------------
+;
+;	RESTART
+;
+; -----------------------------------------------------------------------------
+
+.L8130	LDA	L8110+1		; RESET UP TO UAREA
 	STA	UP+1
 	LDA	L8110
 	STA	UP
-.L813A	LDA	L810C,Y
+.L813A	LDA	L810C,Y		; INITIALISE USER VARIABLES
 	STA	(UP),Y
 	DEY
 	BPL	L813A
-	LDA	#$6C
+	LDA	#$6C		; SET JMP (W) OPCODE
 	STA	W-1
 	CLD
 	JMP	RPSTO+2		; RUN FORTH
 
-;	LIT
+; -----------------------------------------------------------------------------
+;
+;	LIT   ( ... n )
+;
+;	> Within a colon-definition, LIT is
+;	> automatically compiled before each 16-bit literal
+;	> number encountered in the input text. Later execution
+;	> of LIT causes the contents of the following two bytes
+;	> to be pushed onto the stack.
+;
+; -----------------------------------------------------------------------------
 
 .L814A	DEFWORD	"LIT"
-	EQUW	0
+	EQUW	0		; FIRST WORD IN DICTIONARY
 .LIT	EQUW	*+2
-	LDA	(IP),Y
-	PHA
-	INC	IP
+	LDA	(IP),Y		; LOAD LO BYTE OF LITERAL
+	PHA			; PUSH ONTO STACK
+	INC	IP		; INCREMENT IP
 	BNE	L815B
 	INC	IP+1
-.L815B	LDA	(IP),Y
-	INC	IP
-	BNE	PUSH
+.L815B	LDA	(IP),Y		; LOAD HI BYTE OF LITERAL
+	INC	IP		; INCREMENT IP
+	BNE	PUSH		; PUSH LITERAL ONTO DATA STACK
 	INC	IP+1
 
-.PUSH	DEX
-	DEX
-.PUT	STA	1,X
-	PLA
+.PUSH	DEX			; MAKE ROOM ON DATA STACK FOR
+	DEX			; 16-BIT VALUE
+
+.PUT	STA	1,X		; STORE 16-BIT VALUE FROM A AND
+	PLA			; RETURN STACK ONTO DATA STACK
 	STA	0,X
-.NEXT	LDY	#1
+
+.NEXT	LDY	#1		; FETCH HI BYTE OF CFA
 .L816C	LDA	(IP),Y
-	STA	W+1
+	STA	W+1		; STORE IN W
 	DEY
-	LDA	(IP),Y
-	STA	W
+	LDA	(IP),Y		; FETCH LO BYTE OF CFA
+	STA	W		; STORE IN W
 	CLC
-	LDA	IP
+	LDA	IP		; ADVANCE IP TO NEXT CFA
 	ADC	#2
 	STA	IP
 	BCC	L8180
 	INC	IP+1
-.L8180	BIT	$FF
+.L8180	BIT	$FF		; TEST FOR ESCAPE PRESSED
 	BMI	L8187
-	JMP	W-1
+	JMP	W-1		; EXECUTE (CFA)
 
-.L8187	JMP	L94ED
+.L8187	JMP	L94ED		; ESCAPE PRESSED
 
 .SETUP	ASL	A
 	STA	$5F
@@ -3065,53 +3083,92 @@ ENDIF
 	EQUW	PABOR
 	EQUW	EXIT
 
-.L94ED	LDA	#$7E
+; -----------------------------------------------------------------------------
+;
+;	ESCAPE PRESSED HANDLER
+;
+; -----------------------------------------------------------------------------
+
+.L94ED	LDA	#$7E		; CLEAR ESCAPE CONDITION
 	JSR	$FFF4
-	LDA	L812C+1
+	LDA	L812C+1		; SET IP TO ESCAPE WORD
 	STA	IP+1
 	LDA	L812C
 	STA	IP
-	LDY	#$F
+	LDY	#$F		; RESTART EXECUTION
 	JMP	L8130
 
-.L9501	LDA	L812E+1
+; -----------------------------------------------------------------------------
+;
+;	BRK HANDLER
+;
+; -----------------------------------------------------------------------------
+
+.L9501	LDA	L812E+1		; SET IP TO OSERROR WORD
 	STA	IP+1
 	LDA	L812E
 	STA	IP
-	LDY	#$F
+	LDY	#$F		; RESTART EXECUTION
 	JMP	L8130
 
+; -----------------------------------------------------------------------------
+;
 ;	COLD
+;
+;	> The cold start procedure used on first
+;	> entry to the system. The dictionary pointer and user
+;	> variables are initialised from the boot-up parameters
+;	> and the system re-started via (ABORT). The mass
+;	> storage buffers are cleared, function keys 8 and 9 are
+;	> initialised, and printer output is disabled. All
+;	> vectored words are set to their default actions. It
+;	> may be called from the keyboard to remove all
+;	> application programs and restart with the nucleus
+;	> dictionary alone.
+;
+; -----------------------------------------------------------------------------
 
 .L9510	DEFWORD	"COLD"
 	EQUW	L94A7
 .COLD	EQUW	*+2
-	LDA	L812A+1		; SET BRKVEC
+	LDA	L812A+1		; SET (BRKV) TO BRK HANDLER
 	STA	$203
 	LDA	L812A
 	STA	$202
-	LDA	L8108+1		; POINT TO START
+	LDA	L8108+1		; SET IP TO START WORD
 	STA	IP+1
 	LDA	L8108
 	STA	IP
-	LDY	#$15
+	LDY	#$15		; RESTART EXECUTION
 	JMP	L8130
 
+; -----------------------------------------------------------------------------
+;
 ;	WARM
+;
+;	> Performs a warm start. The stacks are
+;	> cleared. The CURRENT and CONTEXT vocabularies are set
+;	> to FORTH, and DECIMAL numeric base is selected. No
+;	> other initialisation takes place. In particular the
+;	> user's dictionary and the contents of the buffer are
+;	> preserved. All vectored routines maintain their current
+;	> assignments.
+;
+; -----------------------------------------------------------------------------
 
 .L9534	DEFWORD	"WARM"
 	EQUW	L9510
 .WARM	EQUW	*+2
-	LDA	L810A+1
+	LDA	L810A+1		; SET IP TO (ABORT)
 	STA	IP+1
 	LDA	L810A
 	STA	IP
-	LDA	L812A+1
+	LDA	L812A+1		; SET (BRKV) TO BRK HANDLER
 	STA	$203
 	LDA	L812A
 	STA	$202
 	LDY	#$F
-	JMP	L8130
+	JMP	L8130		; RESTART EXECUTION
 
 ;	S->D
 

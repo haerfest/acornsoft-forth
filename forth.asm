@@ -904,7 +904,16 @@ ORIG	=	*		; FORTH ORIGIN
 	JSR	$FFE0
 	JMP	L842B
 
-;	EXIT
+; -----------------------------------------------------------------------------
+;
+;	EXIT   ( ... )
+;
+;	> When compiled within a colon-definition,
+;	> terminates execution of the definition at that point.
+;	> It may not be used within a DO ... LOOP . It is also
+;	> used to terminate the interpretation of mass storage.
+;
+; -----------------------------------------------------------------------------
 
 .L85E7	DEFWORD	"EXIT"
 	EQUW	LA006-REL
@@ -2826,7 +2835,27 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	STORE
 	EQUW	EXIT
 
-;	QUIT
+; -----------------------------------------------------------------------------
+;
+;	QUIT   ( ... )
+;
+;	> Clears the return stack, stops and
+;	> returns control to the keyboard. No message is given.
+;
+;	: QUIT
+;	 0 BLK !
+;	 [
+;	 RP!
+;	 BEGIN
+;	  CR
+;	  QUERY INTERPRET
+;	  STATE @ 0= IF
+;	   ." OK"
+;	  THEN
+;	 AGAIN
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L939D	DEFWORD	"QUIT"
 	EQUW	LA03F-REL
@@ -2859,7 +2888,25 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	STORE
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
 ;	(WARM)
+;
+;	> A routine which returns control to the
+;	> keyboard interpreter. It is used by COLD, WARM and the
+;	> error-handling procedures. The numeric base is set to
+;	> decimal and FORTH becomes both the current and context
+;	> vocabularies. The return stack (but not the computation
+;	> stack) is cleared.
+;
+;	: (WARM)
+;	 SP!
+;	 CR ." OK"
+;	 DECIMAL
+;	 FORTH DEFINITIONS
+;	 QUIT
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L93E5	DEFWORD	"(WARM)"
 	EQUW	L93CB
@@ -2874,7 +2921,21 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	QUIT
 	EQUW	EXIT
 
-;	(ABORT)
+; -----------------------------------------------------------------------------
+;
+;	(ABORT)   ( ... )
+;
+;	> Clears the data and return stacks and
+;	> sets execution mode. Control is returned to the
+;	> keyboard interpreter. See ABORT .
+;
+;	: (ABORT)
+;	 SP!
+;	 CR CR ." FORTH"
+;	 (WARM)
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L9403	DEFWORD	"(ABORT)"
 	EQUW	L93E5
@@ -2946,7 +3007,7 @@ ORIG	=	*		; FORTH ORIGIN
 
 ; -----------------------------------------------------------------------------
 ;
-;	START  ( ... )
+;	START   ( ... )
 ;
 ;	> The high-level entry point to FORTH on a
 ;	> cold start. The computation and return stacks are
@@ -2968,6 +3029,7 @@ ORIG	=	*		; FORTH ORIGIN
 ;	 PAGE 2+   DUP DP !   FENCE !
 ;	 (ABORT)
 ;	;
+;
 ; -----------------------------------------------------------------------------
 
 .L94A7	DEFWORD	"START"

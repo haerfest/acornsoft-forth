@@ -3008,7 +3008,9 @@ ORIG	=	*		; FORTH ORIGIN
 ;	 CR ." O.S.Error "   $00FD @   DUP C@ DEC.
 ;	 0 CLOSE
 ;	 SPACE   BEGIN
-;	          1+ DUP C@
+;	          1+
+;	          DUP C@
+;	          DUP
 ;	         WHILE
 ;	          EMIT
 ;	         REPEAT

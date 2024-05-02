@@ -2,6 +2,12 @@
 ; BBC FORTH ROM DISASSEMBLY
 ;
 
+; -----------------------------------------------------------------------------
+;
+;	MACROS
+;
+; -----------------------------------------------------------------------------
+
 MACRO DEFENTRY flags%,name$
 	EQUB	flags%+LEN(name$)
 	IF LEN(name$)>1
@@ -18,6 +24,17 @@ MACRO DEFIMM name$
 	DEFENTRY	$C0,name$
 ENDMACRO
 
+; -----------------------------------------------------------------------------
+;
+;	FORTH CONFIGURATION FLAGS
+;
+; -----------------------------------------------------------------------------
+
+KEEP_IN_ROM		=?	FALSE
+REMOVE_UNREACHABLES	=?	FALSE
+
+; -----------------------------------------------------------------------------
+
 BOS	=	$10		; BOTTOM OF DATA STACK
 TOS	=	$58		; TOP OF DATA STACK
 N	=	$60		; SCRATCH WORKSPACE
@@ -32,7 +49,7 @@ UAREA	=	$400		; USER AREA
 WORDBU	=	UAREA+64	; WORD BUFFER
 TIBB	=	WORDBU+WBSIZ	; TERMINAL INPUT BUFFER
 PADD	=	TIBB+126	; PAD
-RAM	=	PADD+80		; RAM RELOCATION ADDR
+RAM	=	PADD+80		; RAM RELOCATION ADDR ($610)
 
 EM	=	$7C00		; END OF MEMORY+1
 BLKSIZ	=	1024
@@ -2927,16 +2944,44 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	TOVDU
 	EQUW	EXIT
 
-;	START
+; -----------------------------------------------------------------------------
+;
+;	START  ( ... )
+;
+;	> The high-level entry point to FORTH on a
+;	> cold start. The computation and return stacks are
+;	> cleared. Any applications dictionary is discarded and
+;	> all vectored words are initialised to their default
+;	> values. The mass storage buffers are initialised to the
+;	> number of buffers given by MINBUF and marked as being
+;	> empty; OFFSET is set to zero. User-defined keys 8 and 9
+;	> are programmed for the correct WARM and COLD entry
+;	> points respectively and printer output is disabled.
+;	> Control is passed to the keyboard interpreter via
+;	> (ABORT) .
+;
+;	: START
+;	 SP!
+;	 INITVECS   INITBUF   0 OFFSET !
+;	 $1E +ORIGIN @ PRUNE
+;	 3 >VDU
+;	 PAGE 2+   DUP DP !   FENCE !
+;	 (ABORT)
+;	;
+; -----------------------------------------------------------------------------
 
 .L94A7	DEFWORD	"START"
 	EQUW	L9484
 .START	EQUW	DOCOL
 	EQUW	SPSTO
+
+IF KEEP_IN_ROM=FALSE
+
 	EQUW	LIT,L9FFB
 	EQUW	LIT,RAM
 	EQUW	LIT,LA19F-L9FFB
 	EQUW	CMOVE
+ENDIF
 	EQUW	INIVEC
 	EQUW	INIBUF
 	EQUW	ZERO
@@ -4400,7 +4445,15 @@ ORIG	=	*		; FORTH ORIGIN
 
 ; START OF BLOCK RELOCATED TO RAM
 
+IF	KEEP_IN_ROM=TRUE
+
+REL	=	0
+
+ELSE
+
 REL	=	*-RAM
+
+ENDIF
 
 ;	EMIT
 
@@ -6719,6 +6772,8 @@ TOPNFA	=	*
 	EQUW	MSGNUM
 	EQUW	EXIT
 
+IF REMOVE_UNREACHABLES=FALSE
+
 ;	MM
 
 .LB146	DEFWORD	"MM"
@@ -6964,6 +7019,8 @@ TOPNFA	=	*
 	EQUB	7,"No room"
 	EQUW	EXIT
 
+ENDIF
+
 .LB47E	EQUW	1
 	EQUB	11,"Stack empty"
 	EQUB	15,"Dictionary full"
@@ -6999,4 +7056,5 @@ FOR n,TOPDP,$BFFF
 
 NEXT
 
+	PRINT	"ROM bytes free: ",$C000-TOPDP
 	SAVE	"forth-assembled.rom",L8000,*

@@ -2895,7 +2895,23 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	BRAN,$FFE7
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	DEFINITIONS
+;
+;	> Sets the CURRENT vocabulary to the
+;	> CONTEXT vocabulary. If used in the form:
+;	>
+;	> CCCC DEFINITIONS
+;	>
+;	> where CCCC is a VOCABULARY word, all subsequent
+;	> definitions will be placed in the vocabulary CCCC.
+;
+;	: DEFINITIONS
+;	 CONTEXT @   CURRENT !
+;	;
+
+; -----------------------------------------------------------------------------
 
 .L93CB	DEFWORD	"DEFINITIONS"
 	EQUW	L939D

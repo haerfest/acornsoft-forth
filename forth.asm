@@ -119,12 +119,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	LDA	#>RomStart
 	STA	PrintStrPtr+1
 	LDY	#0
-.L8054	LDA	(PrintStrPtr),Y
-	BEQ	L805E
+.PrintChr	
+	LDA	(PrintStrPtr),Y
+	BEQ	PrintStrDone
 	JSR	OSWRCH
 	INY
-	BNE	L8054
-.L805E	RTS
+	BNE	PrintChr
+.PrintStrDone
+	RTS
 
 ; -----------------------------------------------------------------------------
 ;
@@ -140,11 +142,12 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	PHA
 	TYA
 	PHA
+
 	LDA	($F2),Y
 	CMP	#'F'
 	BEQ	GotF
 	CMP	#'f'
-	BNE	L80AC
+	BNE	NotFORTH
 .GotF	
 	INY
 	LDA	($F2),Y
@@ -178,6 +181,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	LDA	($F2),Y
 	CMP	#CarriageReturn
 	BNE	CheckAbbreviated
+
 	LDA	#EnterLanguageRom
 	JMP	OSBYTE
 
@@ -185,7 +189,8 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	CMP	#'.'
 	BEQ	GotFORTH
 
-.L80AC	PLA
+.NotFORTH
+	PLA
 	TAY
 	PLA
 	RTS
@@ -229,15 +234,18 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	CLI
 	LDA	#<ColdWarmStartStr
 	STA	PrintStrPtr
+
 .AskWarmCold
 	JSR	PrintStr
 	JSR	OSRDCH
 	CMP	#EscapeKey
 	BNE	CheckWarmCold
+
 	PHA
 	LDA	#ClearEscapeCondition
 	JSR	OSBYTE
 	PLA
+
 .CheckWarmCold
 	CMP	#'W'
 	BEQ	UserChoseWarm
@@ -262,6 +270,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .ORIG
 	NOP
 	NOP
+
 .JumpCold
 	JMP	COLD+2
 .JumpWarm
@@ -304,13 +313,13 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .Restart
-	LDA	InitialUP+1		; RESET UP TO UAREA
+	LDA	InitialUP+1
 	STA	UP+1
 	LDA	InitialUP
 	STA	UP
 
 .ResetBootUpLiterals
-	LDA	BootUpLiterals,Y	; INITIALISE USER VARIABLES
+	LDA	BootUpLiterals,Y
 	STA	(UP),Y
 	DEY
 	BPL	ResetBootUpLiterals
@@ -337,6 +346,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	DEFWORD	"LIT"
 	EQUW	0		; FIRST WORD IN DICTIONARY
 .LIT	EQUW	*+2
+
 	LDA	(IP),Y		; LOAD LO BYTE OF LITERAL
 	PHA			; PUSH ONTO STACK
 	INC	IP		; INCREMENT IP
@@ -354,25 +364,28 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	PLA			; RETURN STACK ONTO DATA STACK
 	STA	0,X
 
-.NEXT	LDY	#1		; FETCH HI BYTE OF CFA
+.NEXT	LDY	#1		; W := (IP)
 .L816C	LDA	(IP),Y
-	STA	W+1		; STORE IN W
+	STA	W+1
 	DEY
-	LDA	(IP),Y		; FETCH LO BYTE OF CFA
-	STA	W		; STORE IN W
-	CLC
-	LDA	IP		; ADVANCE IP TO NEXT CFA
+	LDA	(IP),Y
+	STA	W
+
+	CLC			; IP := IP + 2
+	LDA	IP
 	ADC	#2
 	STA	IP
 	BCC	CheckEscape
 	INC	IP+1
+
 .CheckEscape
 	BIT	EscapeFlag
 	BMI	EscapePressed
-	JMP	W-1		; EXECUTE JMP (CFA)
+
+	JMP	W-1		; JMP (W)
 
 .EscapePressed
-	JMP	EscapeHandler		; ESCAPE PRESSED
+	JMP	EscapeHandler
 
 .SETUP	ASL	A
 	STA	$5F
@@ -387,22 +400,26 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	EXECUTE
 
-.L819B	DEFWORD	"EXECUTE"
+.EXEC_NFA
+	DEFWORD	"EXECUTE"
 	EQUW	LIT_NFA
 .EXEC	EQUW	*+2
-	LDA	0,X
+
+	LDA	0,X		; W := POP()
 	STA	W
 	LDA	1,X
 	STA	W+1
 	INX
 	INX
-	JMP	W-1
+	
+	JMP	W-1		; JMP (W)
 
 ;	@EXECUTE
 
 .L81B4	DEFWORD	"@EXECUTE"
-	EQUW	L819B
+	EQUW	EXEC_NFA
 .ATEXEC	EQUW	*+2
+
 	LDA	(0,X)
 	STA	W
 	INC	0,X
@@ -412,6 +429,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	W+1
 	INX
 	INX
+
 	JMP	W-1
 
 ;	BRANCH

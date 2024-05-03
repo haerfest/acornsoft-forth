@@ -9,19 +9,19 @@
 ; -----------------------------------------------------------------------------
 
 MACRO DEFENTRY flags%,name$
-	EQUB	flags%+LEN(name$)
+	EQUB flags%+LEN(name$)
 	IF LEN(name$)>1
-	EQUB	MID$(name$,1,LEN(name$)-1)
+		EQUB MID$(name$,1,LEN(name$)-1)
 	ENDIF
-	EQUB	$80+ASC(RIGHT$(name$,1))
+	EQUB $80+ASC(RIGHT$(name$,1))
 ENDMACRO
 
 MACRO DEFWORD name$
-	DEFENTRY	$80,name$
+	DEFENTRY $80,name$
 ENDMACRO
 
 MACRO DEFIMM name$
-	DEFENTRY	$C0,name$
+	DEFENTRY $C0,name$
 ENDMACRO
 
 ; -----------------------------------------------------------------------------
@@ -32,6 +32,29 @@ ENDMACRO
 
 KEEP_IN_ROM		=?	FALSE
 REMOVE_UNREACHABLES	=?	FALSE
+
+; -----------------------------------------------------------------------------
+;
+;	OPERATING SYSTEM CALLS
+;
+; -----------------------------------------------------------------------------
+
+BRKV	=	$0202
+
+OSBYTE	=	&FFF4
+OSNEWL	=	&FFE7
+OSRDCH	=	&FFE0
+OSWORD	=	&FFF1
+OSWRCH	=	&FFEE
+
+LineFeed		=	&0A
+CarriageReturn		=	&0D
+EscapeFlag		=	$FF
+EscapeKey		=	27
+ClearEscapeCondition	=	&7E
+EnterLanguageRom	=	$8E
+PrintStrPtr		=	&12
+JmpIndirectOpcode	=	&6C
 
 ; -----------------------------------------------------------------------------
 
@@ -58,155 +81,202 @@ NOBUF	=	2
 BUFS	=	NOBUF*HDBT
 BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
-	ORG	$8000		; ROM ADDRESS
-
+; -----------------------------------------------------------------------------
+;
 ;	ROM HEADER
+;
+; -----------------------------------------------------------------------------
+	
+	ORG	$8000
 
-.L8000	JMP	L80D5		; LANGUAGE ENTRY
-.L8003	JMP	L805F		; SERVICE ENTRY
-.L8006	EQUB	$E2		; ROM TYPE
-.L8007	EQUB	COPYR-L8000	; COPYRIGHT OFFSET
-.L8008	EQUB	1		; BINARY VERSION NUMBER
-.TITLE	EQUB	"FORTH"		; TITLE STRING
-	EQUB	0
-.VERS	EQUB	"1.03"		; VERSION STRING
-.COPYR	EQUB	0,"(C)"		; COPYRIGHT IDENT
-	EQUB	" Acornsoft Ltd. 1983"
-	EQUB	0
-	EQUW	L8000		; TUBE RELOC ADDRESS
+.RomStart
+	JMP	LanguageEntry
+	JMP	ServiceEntry
+.RomType
+	EQUB	%11100010
+.CopyrightOffset
+	EQUB	CopyrightStr-1-RomStart
+.BinaryVersion
+	EQUB	1
+.TitleStr
+	EQUB	"FORTH",0
+.VersionStr	
+	EQUB	"1.03",0
+.CopyrightStr	
+	EQUB	"(C) Acornsoft Ltd. 1983",0
+.TubeRelocationAddress
+	EQUW	RomStart
 
-	EQUW	0
+	EQUW	0			; UNUSED
 
-.L8030	EQUB	$A,$D,"COLD or WARM start (C/W)? ",0
-	EQUB	0
+.ColdWarmStartStr
+	EQUB	LineFeed,CarriageReturn
+	EQUB	"COLD or WARM start (C/W)? ",0
 
-.L804E	LDA	#>L8000
-	STA	$13
+	EQUB	0			; UNUSED
+
+.PrintStr
+	LDA	#>RomStart
+	STA	PrintStrPtr+1
 	LDY	#0
-.L8054	LDA	($12),Y
+.L8054	LDA	(PrintStrPtr),Y
 	BEQ	L805E
-	JSR	$FFEE
+	JSR	OSWRCH
 	INY
 	BNE	L8054
 .L805E	RTS
 
+; -----------------------------------------------------------------------------
+;
 ;	SERVICE ENTRY
+;
+; -----------------------------------------------------------------------------
 
-.L805F	CMP	#4
-	BNE	L80B0
+.ServiceEntry	
+	CMP	#4
+	BNE	NotUnrecognisedStarCommand
+
+.UnrecognisedStarCommand
 	PHA
 	TYA
 	PHA
 	LDA	($F2),Y
 	CMP	#'F'
-	BEQ	L8070
+	BEQ	GotF
 	CMP	#'f'
 	BNE	L80AC
-.L8070	INY
+.GotF	
+	INY
 	LDA	($F2),Y
 	CMP	#'O'
-	BEQ	L807B
+	BEQ	GotFO
 	CMP	#'o'
-	BNE	L80A8
-
-.L807B	INY
+	BNE	CheckAbbreviated
+.GotFO	
+	INY
 	LDA	($F2),Y
 	CMP	#'R'
-	BEQ	L8086
+	BEQ	GotFOR
 	CMP	#'r'
-	BNE	L80A8
-.L8086	INY
+	BNE	CheckAbbreviated
+.GotFOR
+	INY
 	LDA	($F2),Y
 	CMP	#'T'
-	BEQ	L8091
+	BEQ	GotFORT
 	CMP	#'t'
-	BNE	L80A8
-.L8091	INY
+	BNE	CheckAbbreviated
+.GotFORT
+	INY
 	LDA	($F2),Y
 	CMP	#'H'
-	BEQ	L809C
+	BEQ	GotFORTH
 	CMP	#'h'
-	BNE	L80A8
-.L809C	INY
+	BNE	CheckAbbreviated
+.GotFORTH
+	INY
 	LDA	($F2),Y
-	CMP	#$D
-	BNE	L80A8
-	LDA	#$8E
-	JMP	$FFF4
+	CMP	#CarriageReturn
+	BNE	CheckAbbreviated
+	LDA	#EnterLanguageRom
+	JMP	OSBYTE
 
-.L80A8	CMP	#'.'
-	BEQ	L809C
+.CheckAbbreviated
+	CMP	#'.'
+	BEQ	GotFORTH
+
 .L80AC	PLA
 	TAY
 	PLA
 	RTS
 
-.L80B0	CMP	#9
-	BEQ	L80B5
+.NotUnrecognisedStarCommand	
+	CMP	#9
+	BEQ	StarHelp
 	RTS
 
-.L80B5	PHA
+.StarHelp	
+	PHA
 	TYA
 	PHA
-	JSR	$FFE7
-	LDA	#<TITLE
-	STA	$12
-	JSR	L804E
+	JSR	OSNEWL
+	LDA	#<TitleStr
+	STA	PrintStrPtr
+	JSR	PrintStr
 	LDA	#' '
-	JSR	$FFEE
-	LDA	#<VERS
-	STA	$12
-	JSR	L804E
-	JSR	$FFE7
+	JSR	OSWRCH
+	LDA	#<VersionStr
+	STA	PrintStrPtr
+	JSR	PrintStr
+	JSR	OSNEWL
 	PLA
 	TAY
 	PLA
 	RTS
 
+; -----------------------------------------------------------------------------
+;
 ;	LANGUAGE ENTRY
+;
+; -----------------------------------------------------------------------------
 
-.L80D5	CMP	#1
-	BEQ	L80DA
+.LanguageEntry
+	CMP	#1
+	BEQ	LanguageEntryProper
 	RTS
 
-.L80DA	CLI
-	LDA	#<L8030
-	STA	$12
-.L80DF	JSR	L804E
-	JSR	$FFE0
-	CMP	#$1B
-	BNE	L80F0
+.LanguageEntryProper
+	CLI
+	LDA	#<ColdWarmStartStr
+	STA	PrintStrPtr
+.AskWarmCold
+	JSR	PrintStr
+	JSR	OSRDCH
+	CMP	#EscapeKey
+	BNE	CheckWarmCold
 	PHA
-	LDA	#$7E
-	JSR	$FFF4
+	LDA	#ClearEscapeCondition
+	JSR	OSBYTE
 	PLA
-.L80F0	CMP	#'W'
-	BEQ	L80FB
+.CheckWarmCold
+	CMP	#'W'
+	BEQ	UserChoseWarm
 	CMP	#'C'
-	BNE	L80DF
-	JMP	L8102
+	BNE	AskWarmCold
 
-.L80FB	JMP	L8105
+.UserChoseCold
+	JMP	JumpCold
+.UserChoseWarm
+	JMP	JumpWarm
 
-	EQUB	$FF,$FF
+	EQUB	$FF,$FF			; UNUSED
 
-	ORG	L8000+$100
+; -----------------------------------------------------------------------------
+;
+;	FORTH ORIGIN
+;
+; -----------------------------------------------------------------------------
+	
+	ORG	RomStart+$100
 
-ORIG	=	*		; FORTH ORIGIN
-
+.ORIG
 	NOP
 	NOP
-.L8102	JMP	COLD+2
-.L8105	JMP	WARM+2
+.JumpCold
+	JMP	COLD+2
+.JumpWarm
+	JMP	WARM+2
 
-.L8108	EQUW	START+2
-.L810A	EQUW	PABOR+2
+.PtrToSTART
+	EQUW	START+2
+.PtrToPABORT
+	EQUW	PABOR+2
 
-; BOOT-UP LITERALS
-
-.L810C	EQUW	TOPNFA		; TOP NFA
+.BootUpLiterals	
+	EQUW	TOPNFA		; TOP NFA
 	EQUW	$7F		; BACKSPACE CHARACTER
-.L8110	EQUW	UAREA		; INITIAL USER AREA
+.InitialUP
+	EQUW	UAREA		; INITIAL USER AREA
 	EQUW	TOS		; INITIAL TOP OF STACK
 	EQUW	$1FF		; INITIAL TOP OF RETURN STACK
 	EQUW	TIBB		; INITIAL TERMINAL INPUT BUFFER
@@ -217,11 +287,15 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	VL0-REL		; INITIAL VOC-LINK
 	EQUW	1
 
-	EQUB	"RdeG-H"	; AUTHOR ?
+.Author
+	EQUB	"RdeG-H"	; Richard de Grandis-Harrison
 
-.L812A	EQUW	L9501		; BRK HANDLER
-.L812C	EQUW	ESCAPE+2	; ESCAPE HANDLER
-.L812E	EQUW	OSERR+2		; OSERROR HANDLER
+.PtrToBrkHandler	
+	EQUW	BrkHandler
+.PtrToESCAPE
+	EQUW	ESCAPE+2
+.PtrToOSERROR
+	EQUW	OSERR+2
 
 ; -----------------------------------------------------------------------------
 ;
@@ -229,16 +303,21 @@ ORIG	=	*		; FORTH ORIGIN
 ;
 ; -----------------------------------------------------------------------------
 
-.L8130	LDA	L8110+1		; RESET UP TO UAREA
+.Restart
+	LDA	InitialUP+1		; RESET UP TO UAREA
 	STA	UP+1
-	LDA	L8110
+	LDA	InitialUP
 	STA	UP
-.L813A	LDA	L810C,Y		; INITIALISE USER VARIABLES
+
+.ResetBootUpLiterals
+	LDA	BootUpLiterals,Y	; INITIALISE USER VARIABLES
 	STA	(UP),Y
 	DEY
-	BPL	L813A
-	LDA	#$6C		; SET JMP (W) OPCODE
+	BPL	ResetBootUpLiterals
+	
+	LDA	#JmpIndirectOpcode
 	STA	W-1
+	
 	CLD
 	JMP	RPSTO+2		; RUN FORTH
 
@@ -254,7 +333,8 @@ ORIG	=	*		; FORTH ORIGIN
 ;
 ; -----------------------------------------------------------------------------
 
-.L814A	DEFWORD	"LIT"
+.LIT_NFA	
+	DEFWORD	"LIT"
 	EQUW	0		; FIRST WORD IN DICTIONARY
 .LIT	EQUW	*+2
 	LDA	(IP),Y		; LOAD LO BYTE OF LITERAL
@@ -284,13 +364,15 @@ ORIG	=	*		; FORTH ORIGIN
 	LDA	IP		; ADVANCE IP TO NEXT CFA
 	ADC	#2
 	STA	IP
-	BCC	L8180
+	BCC	CheckEscape
 	INC	IP+1
-.L8180	BIT	$FF		; TEST FOR ESCAPE PRESSED
-	BMI	L8187
-	JMP	W-1		; EXECUTE (CFA)
+.CheckEscape
+	BIT	EscapeFlag
+	BMI	EscapePressed
+	JMP	W-1		; EXECUTE JMP (CFA)
 
-.L8187	JMP	L94ED		; ESCAPE PRESSED
+.EscapePressed
+	JMP	EscapeHandler		; ESCAPE PRESSED
 
 .SETUP	ASL	A
 	STA	$5F
@@ -306,7 +388,7 @@ ORIG	=	*		; FORTH ORIGIN
 ;	EXECUTE
 
 .L819B	DEFWORD	"EXECUTE"
-	EQUW	L814A
+	EQUW	LIT_NFA
 .EXEC	EQUW	*+2
 	LDA	0,X
 	STA	W
@@ -521,11 +603,11 @@ ORIG	=	*		; FORTH ORIGIN
 	LDA	2,X
 	SBC	#'0'
 	BMI	L8348
-	CMP	#$A
+	CMP	#10
 	BMI	L833B
 	SEC
 	SBC	#7
-	CMP	#$A
+	CMP	#10
 	BMI	L8348
 .L833B	CMP	0,X
 	BPL	L8348
@@ -919,7 +1001,7 @@ ORIG	=	*		; FORTH ORIGIN
 .L85D7	DEFWORD	"(KEY)"
 	EQUW	L858F
 .PKEY	EQUW	*+2
-	JSR	$FFE0
+	JSR	OSRDCH
 	JMP	L842B
 
 ; -----------------------------------------------------------------------------
@@ -1409,15 +1491,15 @@ ORIG	=	*		; FORTH ORIGIN
 	EQUW	CREAT
 	EQUW	RBRAC
 	EQUW	PSCOD
-.DOCOL	LDA	IP+1
+.DOCOL	LDA	IP+1		; SAVE IP OF THE WORD THAT IS
+	PHA			; CALLING US ONTO THE RETURN
+	LDA	IP		; STACK
 	PHA
-	LDA	IP
-	PHA
-	CLC
-	LDA	W
-	ADC	#2
-	STA	IP
-	TYA
+	CLC			; SINCE W POINTS TO THE CURRENT
+	LDA	W		; WORD'S CFA, WHERE WE ARE CALLED
+	ADC	#2		; FROM, SETTING IP TO W+2 HERE MEANS
+	STA	IP		; POINTING IT TO THE WORD'S PFA
+	TYA			; NOTE THAT Y IS ALWAYS ZERO
 	ADC	W+1
 	STA	IP+1
 	JMP	NEXT
@@ -2066,9 +2148,9 @@ ORIG	=	*		; FORTH ORIGIN
 .L8D4D	DEFWORD	"CR"
 	EQUW	L8D37
 .CRR	EQUW	DOCOL
-	EQUW	LIT,$A
+	EQUW	LIT,LineFeed
 	EQUW	EMIT
-	EQUW	LIT,$D
+	EQUW	LIT,CarriageReturn
 	EQUW	EMIT
 	EQUW	NEGTWO
 	EQUW	OUT
@@ -3064,7 +3146,8 @@ ORIG	=	*		; FORTH ORIGIN
 
 ;	MODE
 
-.L9484	DEFWORD	"MODE"
+.MODE_NFA
+	DEFWORD	"MODE"
 	EQUW	L943D
 .MODE	EQUW	DOCOL
 	EQUW	HIADR
@@ -3100,14 +3183,15 @@ ORIG	=	*		; FORTH ORIGIN
 ;	 INITVECS   INITBUF   0 OFFSET !
 ;	 $1E +ORIGIN @ PRUNE
 ;	 3 >VDU
-;	 PAGE 2+   DUP DP !   FENCE !
+;	 PAGE 2+ DUP   DP !   FENCE !
 ;	 (ABORT)
 ;	;
 ;
 ; -----------------------------------------------------------------------------
 
-.L94A7	DEFWORD	"START"
-	EQUW	L9484
+.START_NFA
+	DEFWORD	"START"
+	EQUW	MODE_NFA
 .START	EQUW	DOCOL
 	EQUW	SPSTO
 
@@ -3120,22 +3204,29 @@ IF KEEP_IN_ROM=FALSE
 ENDIF
 	EQUW	INIVEC
 	EQUW	INIBUF
+
 	EQUW	ZERO
 	EQUW	OFFSE
 	EQUW	STORE
+	
 	EQUW	LIT,$1E
 	EQUW	PORIG
 	EQUW	AT
 	EQUW	PRUNE
+	
 	EQUW	LIT,3
 	EQUW	TOVDU
+	
 	EQUW	PAGE
 	EQUW	TWOP
 	EQUW	DUPP
+	
 	EQUW	DP
 	EQUW	STORE
+	
 	EQUW	FENCE
 	EQUW	STORE
+	
 	EQUW	PABOR
 	EQUW	EXIT
 
@@ -3145,14 +3236,17 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L94ED	LDA	#$7E		; CLEAR ESCAPE CONDITION
-	JSR	$FFF4
-	LDA	L812C+1		; SET IP TO ESCAPE WORD
+.EscapeHandler
+	LDA	#ClearEscapeCondition
+	JSR	OSBYTE
+
+	LDA	PtrToESCAPE+1
 	STA	IP+1
-	LDA	L812C
+	LDA	PtrToESCAPE
 	STA	IP
-	LDY	#$F		; RESTART EXECUTION
-	JMP	L8130
+
+	LDY	#$0F
+	JMP	Restart
 
 ; -----------------------------------------------------------------------------
 ;
@@ -3160,12 +3254,14 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9501	LDA	L812E+1		; SET IP TO OSERROR WORD
+.BrkHandler
+	LDA	PtrToOSERROR+1
 	STA	IP+1
-	LDA	L812E
+	LDA	PtrToOSERROR
 	STA	IP
-	LDY	#$F		; RESTART EXECUTION
-	JMP	L8130
+
+	LDY	#$0F
+	JMP	Restart
 
 ; -----------------------------------------------------------------------------
 ;
@@ -3184,19 +3280,23 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9510	DEFWORD	"COLD"
-	EQUW	L94A7
+.COLD_NFA
+	DEFWORD	"COLD"
+	EQUW	START_NFA
 .COLD	EQUW	*+2
-	LDA	L812A+1		; SET (BRKV) TO BRK HANDLER
-	STA	$203
-	LDA	L812A
-	STA	$202
-	LDA	L8108+1		; SET IP TO START WORD
+
+	LDA	PtrToBrkHandler+1
+	STA	BRKV+1
+	LDA	PtrToBrkHandler
+	STA	BRKV
+
+	LDA	PtrToSTART+1
 	STA	IP+1
-	LDA	L8108
+	LDA	PtrToSTART
 	STA	IP
-	LDY	#$15		; RESTART EXECUTION
-	JMP	L8130
+
+	LDY	#$15
+	JMP	Restart
 
 ; -----------------------------------------------------------------------------
 ;
@@ -3213,18 +3313,21 @@ ENDIF
 ; -----------------------------------------------------------------------------
 
 .L9534	DEFWORD	"WARM"
-	EQUW	L9510
+	EQUW	COLD_NFA
 .WARM	EQUW	*+2
-	LDA	L810A+1		; SET IP TO (ABORT)
+
+	LDA	PtrToPABORT+1
 	STA	IP+1
-	LDA	L810A
+	LDA	PtrToPABORT
 	STA	IP
-	LDA	L812A+1		; SET (BRKV) TO BRK HANDLER
-	STA	$203
-	LDA	L812A
-	STA	$202
-	LDY	#$F
-	JMP	L8130		; RESTART EXECUTION
+
+	LDA	PtrToBrkHandler+1
+	STA	BRKV+1
+	LDA	PtrToBrkHandler
+	STA	BRKV
+
+	LDY	#$0F
+	JMP	Restart
 
 ;	S->D
 
@@ -4228,7 +4331,7 @@ ENDIF
 	EQUW	OVER
 	EQUW	STORE
 	EQUW	PSA
-	EQUW	LIT,$D
+	EQUW	LIT,CarriageReturn
 	EQUW	SPAT
 	EQUW	ONE
 	EQUW	PAD
@@ -4745,7 +4848,7 @@ CHANNE	=	XCHANN-REL
 .LA093	DEFWORD	"FNAME"
 	EQUW	LA085-REL
 .XFNAM	EQUW	DOVAR
-	EQUB	"1SCREEN",$D
+	EQUB	"1SCREEN",CarriageReturn
 
 FNAME	=	XFNAM-REL
 
@@ -4818,7 +4921,7 @@ UPDAT	=	XUPDA-REL
 	EQUW	L9FC8
 .XPDIS	EQUW	DOCOL
 	EQUW	PCLI
-	EQUB	5,"DISK",$D
+	EQUB	5,"DISK",CarriageReturn
 	EQUW	EXIT
 
 PDISK	=	XPDIS-REL
@@ -4832,7 +4935,7 @@ PDISK	=	XPDIS-REL
 	EQUB	16
 	EQUB	"LOAD"""
 .LA11A	EQUB	"XXXX"" "
-.LA120	EQUB	"YYYY",$D
+.LA120	EQUB	"YYYY",CarriageReturn
 	EQUW	EXIT
 
 TLD	=	XTLD-REL
@@ -4843,7 +4946,7 @@ TLD	=	XTLD-REL
 	EQUW	LA10A-REL
 .XTSV	EQUW	DOCOL
 	EQUW	PCLI
-	EQUB	21,"SAVE""XXXX"" YYYY ZZZZ",$D
+	EQUB	21,"SAVE""XXXX"" YYYY ZZZZ",CarriageReturn
 	EQUW	EXIT
 
 TSV	=	XTSV-REL
@@ -4858,7 +4961,7 @@ TSV	=	XTSV-REL
 	EQUB	"SAVE"""
 .LA159	EQUB	"XSCREEN"" "
 .LA162	EQUB	"XXXX "
-.LA167	EQUB	"YYYY",$D
+.LA167	EQUB	"YYYY",CarriageReturn
 	EQUW	EXIT
 
 SSV	=	XSSV-REL
@@ -5113,7 +5216,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	LA330
 .TAPE	EQUW	DOCOL
 	EQUW	PCLI
-	EQUB	5,"TAPE",$D
+	EQUB	5,"TAPE",CarriageReturn
 	EQUW	LIT,RSW+2
 	EQUW	LIT,TRSW+2
 	EQUW	DOVEC
@@ -7232,4 +7335,4 @@ FOR n,TOPDP,$BFFF
 NEXT
 
 	PRINT	"ROM bytes free: ",$C000-TOPDP
-	SAVE	"forth-assembled.rom",L8000,*
+	SAVE	"forth-assembled.rom",RomStart,*

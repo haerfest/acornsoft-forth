@@ -136,7 +136,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .ServiceEntry	
 	CMP	#4
-	BNE	NotUnrecognisedStarCommand
+	BNE	StarCommand
 
 .UnrecognisedStarCommand
 	PHA
@@ -147,36 +147,36 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	CMP	#'F'
 	BEQ	GotF
 	CMP	#'f'
-	BNE	NotFORTH
+	BNE	NotStarForth
 .GotF	
 	INY
 	LDA	($F2),Y
 	CMP	#'O'
-	BEQ	GotFO
+	BEQ	GotFo
 	CMP	#'o'
 	BNE	CheckAbbreviated
-.GotFO	
+.GotFo	
 	INY
 	LDA	($F2),Y
 	CMP	#'R'
-	BEQ	GotFOR
+	BEQ	GotFor
 	CMP	#'r'
 	BNE	CheckAbbreviated
-.GotFOR
+.GotFor
 	INY
 	LDA	($F2),Y
 	CMP	#'T'
-	BEQ	GotFORT
+	BEQ	GotFort
 	CMP	#'t'
 	BNE	CheckAbbreviated
-.GotFORT
+.GotFort
 	INY
 	LDA	($F2),Y
 	CMP	#'H'
-	BEQ	GotFORTH
+	BEQ	GotForth
 	CMP	#'h'
 	BNE	CheckAbbreviated
-.GotFORTH
+.GotForth
 	INY
 	LDA	($F2),Y
 	CMP	#CarriageReturn
@@ -187,15 +187,15 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .CheckAbbreviated
 	CMP	#'.'
-	BEQ	GotFORTH
+	BEQ	GotForth
 
-.NotFORTH
+.NotStarForth
 	PLA
 	TAY
 	PLA
 	RTS
 
-.NotUnrecognisedStarCommand	
+.StarCommand	
 	CMP	#9
 	BEQ	StarHelp
 	RTS
@@ -345,7 +345,8 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .LIT_NFA	
 	DEFWORD	"LIT"
 	EQUW	0		; FIRST WORD IN DICTIONARY
-.LIT	EQUW	*+2
+.LIT
+	EQUW	*+2
 
 	LDA	(IP),Y		; LOAD LO BYTE OF LITERAL
 	PHA			; PUSH ONTO STACK
@@ -403,7 +404,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .EXEC_NFA
 	DEFWORD	"EXECUTE"
 	EQUW	LIT_NFA
-.EXEC	EQUW	*+2
+.EXECUTE	EQUW	*+2
 
 	LDA	0,X		; W := POP()
 	STA	W
@@ -575,10 +576,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	LDA	0,X
 	PHA
 
-.POPTWO	INX
+.POPTWO	INX			; X := X + 2
 	INX
 
-.POP	INX
+.POP	INX			; X := X + 2
 	INX
 	JMP	NEXT
 
@@ -1044,7 +1045,8 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	R@
 
-.L85F9	DEFWORD	"R@"
+.RAT_NFA
+	DEFWORD	"R@"
 	EQUW	L85E7
 .RAT	EQUW	*+2
 	STX	XSAVE
@@ -1057,8 +1059,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	>R
 
-.L860F	DEFWORD	">R"
-	EQUW	L85F9
+.TOR_NFA
+	DEFWORD	">R"
+	EQUW	RAT_NFA
 .TOR	EQUW	*+2
 	LDA	1,X
 	PHA
@@ -1068,8 +1071,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	R>
 
-.L861F	DEFWORD	"R>"
-	EQUW	L860F
+.RFROM_NFA
+	DEFWORD	"R>"
+	EQUW	TOR_NFA
 .RFROM	EQUW	*+2
 	DEX
 	DEX
@@ -1081,8 +1085,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	><
 
-.L8631	DEFWORD	"><"
-	EQUW	L861F
+.BSWAP_NFA
+	DEFWORD	"><"
+	EQUW	RFROM_NFA
 .BSWAP	EQUW	*+2
 	LDY	0,X
 	LDA	1,X
@@ -1093,7 +1098,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;	LEAVE
 
 .L8643	DEFWORD	"LEAVE"
-	EQUW	L8631
+	EQUW	BSWAP_NFA
 .LEAV	EQUW	*+2
 	STX	XSAVE
 	TSX
@@ -1495,16 +1500,39 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	(2,X)
 	JMP	POPTWO
 
+; -----------------------------------------------------------------------------
+;
 ;	R:
+;
+;	> A recursive version of <:> used as:
+;	>
+;	> R: NNNN .... R;
+;	>
+;	> With this form of colon-definition references may be
+;	> made from within the definition to the name NNNN
+;	> itself. It should be used with care since any error
+;	> during compilation will leave the incomplete definition
+;	> in an executable form.
+;
+;	: R:
+;	 ?EXEC
+;	 !CSP
+;	 CURRENT @   CONTEXT !
+;	 CREATE
+;	 ]   (;CODE)
+;	 ...
+;	;
+;	 
+; -----------------------------------------------------------------------------
 
 .L88FF	DEFWORD	"R:"
 	EQUW	L88EB
 .RCOLON	EQUW	DOCOL
 	EQUW	QEXEC
 	EQUW	SCSP
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	STORE
 	EQUW	CREAT
 	EQUW	RBRAC
@@ -1748,21 +1776,23 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .L8A82	DEFWORD	"OFFSET"
 	EQUW	L8A79
-.OFFSE	EQUW	DOUSE
+.OFFSET	EQUW	DOUSE
 	EQUB	$1E
 
 ;	CONTEXT
 
 .L8A8E	DEFWORD	"CONTEXT"
 	EQUW	L8A82
-.CONT	EQUW	DOUSE
+.CONTEXT
+	EQUW	DOUSE
 	EQUB	$20
 
 ;	CURRENT
 
 .L8A9B	DEFWORD	"CURRENT"
 	EQUW	L8A8E
-.CURR	EQUW	DOUSE
+.CURRENT
+	EQUW	DOUSE
 	EQUB	$22
 
 ;	STATE
@@ -1899,7 +1929,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .L8B65	DEFWORD	"LAST"
 	EQUW	L8B54
 .LAST	EQUW	DOCOL
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	AT
 	EQUW	EXIT
@@ -2044,7 +2074,24 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	QERR
 	EQUW	EXIT
 
-;	?PAIRS
+; -----------------------------------------------------------------------------
+;
+;	?PAIRS   ( n1\n2 ... )
+;
+;	> Issues an error message if n1 does not
+;	> equal n2. The message indicates that compiled
+;	> conditionals (IF ... ELSE ... THEN or BEGIN ... UNTIL
+;	> etc.) do not match. It is part of the compiler security.
+;	> The error message is given if, for example,
+;	> the sequence IF ... UNTIL is found during compilation
+;	> of a dictionary entry.
+;
+;	: ?PAIRS
+;	 -
+;	 19 ?ERROR
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L8C6A	DEFWORD	"?PAIRS"
 	EQUW	L8C54
@@ -2618,7 +2665,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .L90C5	DEFWORD	"FIND"
 	EQUW	L90B1
 .FIND	EQUW	DOCOL
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	AT
 	EQUW	AT
 	EQUW	DFIND
@@ -2700,7 +2747,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	LIT,10
 	EQUW	QERR
 	EQUW	OVER
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	AT
 	EQUW	AT
 	EQUW	PFIND
@@ -2740,7 +2787,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	TOGGL
 	EQUW	LAST
 	EQUW	COMMA
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	STORE
 	EQUW	LIT,DOVAR
@@ -2752,7 +2799,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .L91E8	DEFIMM	"[COMPILE]"
 	EQUW	LA028-REL
 .BCOMP	EQUW	DOCOL
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	AT
 	EQUW	AT
 	EQUW	DFIND
@@ -2807,9 +2854,28 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	QERR
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	:
+;
+;	> Used to create a colon-definition in the form
+;	>
+;	> : CCCC .... ;
+;	>
+;	> Creates a dictionary entry for the word CCCC as being
+;	> equivalent to the sequence of FORTH words until the
+;	> next <;>. Each word in the sequence is compiled into
+;	> the dictionary entry, unless it is in the immediate
+;	> execution mode.
+;
+;	: :
+;	 R:   SMUDGE
+;	;
+;
+; -----------------------------------------------------------------------------
 
-.L926A	DEFWORD	":"
+.COLON_NFA
+	DEFWORD	":"
 	EQUW	L9243
 .COLON	EQUW	DOCOL
 	EQUW	RCOLON
@@ -2819,7 +2885,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;	;
 
 .L9276	DEFIMM	";"
-	EQUW	L926A
+	EQUW	COLON_NFA
 .SEMIS	EQUW	DOCOL
 	EQUW	RSEMI
 	EQUW	SMUDG
@@ -2908,8 +2974,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .L9329	DEFWORD	"INTERPRET"
 	EQUW	LA035-REL
-.INTE	EQUW	DOCOL
-	EQUW	CONT
+.INTERPRET
+	EQUW	DOCOL
+
+	EQUW	CONTEXT
 	EQUW	AT
 	EQUW	AT
 	EQUW	DFIND
@@ -2920,7 +2988,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	ZBRAN,8
 	EQUW	COMMA
 	EQUW	BRAN,4
-	EQUW	EXEC
+	EQUW	EXECUTE
 	EQUW	BRAN,6
 	EQUW	WBFR
 	EQUW	NUM
@@ -2932,11 +3000,12 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .L9365	DEFWORD	"VOCABULARY"
 	EQUW	L9329
-.VOC	EQUW	DOCOL
+.VOCABULARY
+	EQUW	DOCOL
 	EQUW	CREAT
 	EQUW	LIT,$A081
 	EQUW	COMMA
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	CFA
 	EQUW	COMMA
@@ -2949,7 +3018,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	PSCOD
 .DOVOC	JSR	DODOE
 	EQUW	TWOP
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	STORE
 	EQUW	EXIT
 
@@ -2985,7 +3054,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	RPSTO
 	EQUW	CRR
 	EQUW	QUERY
-	EQUW	INTE
+	EQUW	INTERPRET
 	EQUW	STATE
 	EQUW	AT
 	EQUW	ZEQU
@@ -3015,10 +3084,13 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .L93CB	DEFWORD	"DEFINITIONS"
 	EQUW	L939D
-.DEFIN	EQUW	DOCOL
-	EQUW	CONT
+
+.DEFINITIONS	
+	EQUW	DOCOL
+
+	EQUW	CONTEXT
 	EQUW	AT
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	STORE
 	EQUW	EXIT
 
@@ -3052,7 +3124,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUB	2,"OK"
 	EQUW	DECIM
 	EQUW	FORTH
-	EQUW	DEFIN
+	EQUW	DEFINITIONS
 	EQUW	QUIT
 	EQUW	EXIT
 
@@ -3224,7 +3296,7 @@ ENDIF
 	EQUW	INIBUF
 
 	EQUW	ZERO
-	EQUW	OFFSE
+	EQUW	OFFSET
 	EQUW	STORE
 	
 	EQUW	LIT,$1E
@@ -3777,7 +3849,20 @@ ENDIF
 	EQUW	AT
 	EQUW	EXIT
 
-;	BACK
+; -----------------------------------------------------------------------------
+;
+;	BACK   ( addr ... )
+;
+;	> Calculates the backward branch offset
+;	> from HERE to addr and copiles into the next available
+;	> dictionary memory address. Used in the compilation
+;	> of conditionals ( AGAIN, UNTIL etc).
+;
+;	: BACK
+;	 HERE - ,
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L9842	DEFWORD	"BACK"
 	EQUW	L9830
@@ -3868,7 +3953,27 @@ ENDIF
 	EQUW	TWO
 	EQUW	EXIT
 
-;	BEGIN
+; -----------------------------------------------------------------------------
+;
+;	BEGIN   ( ... addr 1 )
+;
+;	> Used in a colon definition in the forms:
+;	>
+;	> BEGIN ... AGAIN
+;	> BEGIN ... UNTIL
+;	> BEGIN ... WHILE ... REPEAT
+;	>
+;	> BEGIN marks the start of a sequence that may be
+;	> executed repeatedly. It acts as a return point from
+;	> the corresponding AGAIN , UNTIL or REPEAT .
+;
+;	: BEGIN
+;	 ?COMP
+;	 HERE 1
+;	;
+;	IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .L98E6	DEFIMM	"BEGIN"
 	EQUW	L98C5
@@ -3890,7 +3995,26 @@ ENDIF
 	EQUW	BACK
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	AGAIN
+;
+;	> Used in a colon-definition in the form:
+;	>
+;	> BEGIN ... AGAIN
+;	>
+;	> During the execution of a word containing this sequence,
+;	> AGAIN forces a branch back to the corresponding BEGIN
+;	> to create an endless loop.
+;
+;	: AGAIN
+;	 1 ?PAIRS
+;	 ?COMP
+;	 BRANCH BACK
+;	;
+;	IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .L990E	DEFIMM	"AGAIN"
 	EQUW	L98F8
@@ -3911,7 +4035,24 @@ ENDIF
 	EQUW	TWOP
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	REPEAT
+;
+;	> Used in a colon-definition in the form:
+;	>
+;	> BEGIN ... WHILE ... REPEAT
+;	>
+;	> In execution REPEAT forces an unconditional branch back
+;	> to BEGIN .
+;
+;	: REPEAT
+;	 >R >R   AGAIN   R> R>
+;	 2 -   THEN
+;	;
+;	IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .L9934	DEFIMM	"REPEAT"
 	EQUW	L9924
@@ -3948,7 +4089,7 @@ ENDIF
 	EQUW	LIT,128
 	EQUW	OUT
 	EQUW	STORE
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	AT
 	EQUW	AT
 	EQUW	OUT
@@ -4079,7 +4220,7 @@ ENDIF
 	EQUW	ZBRAN,$5A
 	EQUW	DUPP
 	EQUW	TWOSUB
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	STORE
 	EQUW	SWAP
 	EQUW	DUPP
@@ -4098,7 +4239,7 @@ ENDIF
 	EQUW	LFA
 	EQUW	AT
 	EQUW	BRAN,$FFE4
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	STORE
 	EQUW	RFROM
@@ -4118,7 +4259,7 @@ ENDIF
 	EQUW	BRAN,$FFA4
 	EQUW	TDROP
 	EQUW	FORTH
-	EQUW	DEFIN
+	EQUW	DEFINITIONS
 	EQUW	EXIT
 
 ;	FORGET
@@ -4126,7 +4267,7 @@ ENDIF
 .L9B03	DEFWORD	"FORGET"
 	EQUW	L9A8F
 .FORG	EQUW	DOCOL
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	AT
 	EQUW	DFIND
@@ -4662,7 +4803,7 @@ ENDIF
 .L9F54	DEFWORD	"BLOCK"
 	EQUW	L9F0B
 .BLOCK	EQUW	DOCOL
-	EQUW	OFFSE
+	EQUW	OFFSET
 	EQUW	AT
 	EQUW	PLUS
 	EQUW	TOR
@@ -4730,7 +4871,7 @@ ENDIF
 	EQUW	STAR
 	EQUW	BLK
 	EQUW	STORE
-	EQUW	INTE
+	EQUW	INTERPRET
 	EQUW	RFROM
 	EQUW	INN
 	EQUW	STORE
@@ -5410,7 +5551,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	LA16E-REL
 .QCURR	EQUW	DOCOL
 	EQUW	TWOP
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
 	EQUW	SUBB
 	EQUW	LIT,14
@@ -6264,9 +6405,9 @@ EDITOR	=	XEDIT-REL
 .LAB1C	DEFIMM	"END-CODE"
 	EQUW	LAB08
 .ENDCOD	EQUW	DOCOL
-	EQUW	CURR
+	EQUW	CURRENT
 	EQUW	AT
-	EQUW	CONT
+	EQUW	CONTEXT
 	EQUW	STORE
 	EQUW	QEXEC
 	EQUW	QCSP
@@ -6374,7 +6515,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	PDOTQ
 	EQUB	19,"1st screen number? "
 	EQUW	QUERY
-	EQUW	INTE
+	EQUW	INTERPRET
 	EQUW	SCR
 	EQUW	STORE
 	EQUW	CLRSCR
@@ -6702,7 +6843,7 @@ EDITOR	=	XEDIT-REL
 .COPY	EQUW	DOCOL
 	EQUW	BSCR
 	EQUW	STAR
-	EQUW	OFFSE
+	EQUW	OFFSET
 	EQUW	AT
 	EQUW	PLUS
 	EQUW	SWAP

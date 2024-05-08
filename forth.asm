@@ -346,11 +346,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;
 ;	LIT   ( ... n )
 ;
-;	> Within a colon-definition, LIT is
-;	> automatically compiled before each 16-bit literal
-;	> number encountered in the input text. Later execution
-;	> of LIT causes the contents of the following two bytes
-;	> to be pushed onto the stack.
+;	> Within a colon-definition, LIT is automatically compiled before each
+;	> 16-bit literal number encountered in the input text. Later execution
+;	> of LIT causes the contents of the following two bytes to be pushed
+;	> onto the stack.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -410,7 +409,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	LDY	#0
 	RTS
 
-;	EXECUTE
+; -----------------------------------------------------------------------------
+;
+;	EXECUTE   ( addr ... )
+;
+;	> Executes the definition whose code field (execution) address is on
+;	> the stack.
+;
+; -----------------------------------------------------------------------------
 
 .EXECUTE_NFA
 	DEFWORD	"EXECUTE"
@@ -426,7 +432,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	
 	JMP	W-1		; JMP (W)
 
-;	@EXECUTE
+; -----------------------------------------------------------------------------
+;
+;	@EXECUTE   ( addr ... )
+;
+;	> Executes the definition whose code field (execution) address is
+;	> contained in the two bytes at the address addr.
+;
+; -----------------------------------------------------------------------------
 
 .FETCHEXECUTE_NFA
 	DEFWORD	"@EXECUTE"
@@ -445,16 +458,26 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 	JMP	W-1
 
+; -----------------------------------------------------------------------------
+;
 ;	BRANCH
+;
+;	> The run-time procedure to cause an unconditional branch. The
+;	> following in-line value is added to the interpretive pointer to cause
+;	> a forward or backward branch. It is compiled by ELSE , AGAIN and
+;	> REPEAT .
+;
+; -----------------------------------------------------------------------------
 
 .BRANCH_NFA	
 	DEFWORD	"BRANCH"
 	EQUW	FETCHEXECUTE_NFA
 .BRANCH
-	EQUW	L81E1
-
-.L81DF	LDX	XSAVE
-.L81E1	CLC
+	EQUW	DOBRANCH
+.DOBRANCHX
+	LDX	XSAVE
+.DOBRANCH
+	CLC
 	LDA	(IP),Y
 	ADC	IP
 	PHA
@@ -466,7 +489,16 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	IP
 	JMP	L816C
 
-;	0BRANCH
+; -----------------------------------------------------------------------------
+;
+;	0BRANCH   ( f ... )
+;
+;	> The run-time procedure to cause a conditional branch. If f is false
+;	> the following in-line number is added to the intepretive pointer to
+;	> cause a forward or backward branch. It is compiled by IF , UNTIL and
+;	> WHILE .
+;
+; -----------------------------------------------------------------------------
 
 .ZEROBRANCH_NFA
 	DEFWORD	"0BRANCH"
@@ -477,7 +509,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	INX
 	LDA	$FE,X
 	ORA	$FF,X
-	BEQ	L81E1
+	BEQ	DOBRANCH
 .BUMP	CLC
 	LDA	IP
 	ADC	#2
@@ -486,7 +518,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	INC	IP+1
 .L8213	JMP	NEXT
 
+; -----------------------------------------------------------------------------
+;
 ;	(LOOP)
+;
+;	> The run-time procedure compiled by LOOP .  It increments the loop
+;	> index by one and tests for loop completion. See LOOP .
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETLOOP_NFA
 	DEFWORD	"(LOOP)"
@@ -509,7 +548,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	SBC	$102,X
 	BVC	L8244
 	EOR	#$80
-.L8244	BPL	L81DF
+.L8244	BPL	DOBRANCHX
 
 .L8246	LDX	XSAVE
 	PLA
@@ -518,7 +557,15 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	PLA
 	JMP	BUMP
 
-;	(+LOOP)
+; -----------------------------------------------------------------------------
+;
+;	(+LOOP)   ( n ... )
+;
+;	> The run-time procedure compiled by +LOOP . It increments the loop
+;	> index by the signed quantity n and tests for loop completion. See
+;	> +LOOP .
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETPLUSLOOP_NFA	
 	DEFWORD	"(+LOOP)"

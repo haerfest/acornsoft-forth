@@ -376,7 +376,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	0,X
 
 .NEXT	LDY	#1		; W := (IP)
-.L816C	LDA	(IP),Y
+.NEXTY1	LDA	(IP),Y
 	STA	W+1
 	DEY
 	LDA	(IP),Y
@@ -446,14 +446,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	EXECUTE_NFA
 .FETCHEXECUTE
 	EQUW	*+2
-	LDA	(0,X)
+	LDA	(0,X)		; LO(W) := (X)
 	STA	W
-	INC	0,X
+	INC	0,X		; (X) := (X) + 1
 	BNE	L81CB
 	INC	1,X
-.L81CB	LDA	(0,X)
+.L81CB	LDA	(0,X)		; HI(W) := (X)
 	STA	W+1
-	INX
+	INX			; X := X + 2
 	INX
 
 	JMP	W-1
@@ -478,16 +478,16 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	LDX	XSAVE
 .DOBRANCH
 	CLC
-	LDA	(IP),Y
+	LDA	(IP),Y		; A := IP + (IP)
 	ADC	IP
 	PHA
-	INY
+	INY			; Y := 1
 	LDA	(IP),Y
 	ADC	IP+1
-	STA	IP+1
+	STA	IP+1		; IP := A
 	PLA
 	STA	IP
-	JMP	L816C
+	JMP	NEXTY1
 
 ; -----------------------------------------------------------------------------
 ;
@@ -1112,17 +1112,16 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;
 ;	EXIT   ( ... )
 ;
-;	> When compiled within a colon-definition,
-;	> terminates execution of the definition at that point.
-;	> It may not be used within a DO ... LOOP . It is also
-;	> used to terminate the interpretation of mass storage.
+;	> When compiled within a colon-definition, terminates execution of the
+;	> definition at that point. It may not be used within a DO ... LOOP .
+;	> It is also used to terminate the interpretation of mass storage.
 ;
 ; -----------------------------------------------------------------------------
 
 .L85E7	DEFWORD	"EXIT"
 	EQUW	LA006-REL
 .EXIT	EQUW	*+2
-	PLA
+	PLA			; IP := POP(R)
 	STA	IP
 	PLA
 	STA	IP+1
@@ -1630,9 +1629,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	FETCH
 	EQUW	CONTEXT
 	EQUW	STORE
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	RBRAC
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 .DOCOLON
 	LDA	IP+1		; SAVE IP OF THE WORD THAT IS
 	PHA			; CALLING US ONTO THE RETURN
@@ -1665,9 +1664,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	L892D
 .CONSTANT
 	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	COMMA
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 .DOCONSTANT
 	LDY	#2
 	LDA	(W),Y
@@ -1683,10 +1682,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	L893E
 .VARIABLE
 	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	ZERO
 	EQUW	COMMA
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 .DOVARIABLE
 	CLC
 	LDA	W
@@ -1719,7 +1718,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	VARIABLE_NFA
 .USER	EQUW	DOCOLON
 	EQUW	CONSTANT
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 .DOUSER	LDY	#2
 	CLC
 	LDA	(W),Y
@@ -2394,11 +2393,23 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	PLUSSTORE
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	(;CODE)
+;
+;	> The run-time procedure compiled by ;CODE that rewrites the code field
+;	> address of the most recently defined word to point to the machine
+;	> code following (;CODE) . It is used by the system defining words
+;	> ( <:>, CONSTANT etc.) to define the machine code actions of
+;	> dictionary entries using them. This is, in a sense, a machine-code
+;	> version of DOES> .
+;
+; -----------------------------------------------------------------------------
 
 .L8D68	DEFWORD	"(;CODE)"
 	EQUW	L8D4D
-.PSCOD	EQUW	DOCOLON
+.BRACKETSEMICOLONCODE
+	EQUW	DOCOLON
 	EQUW	RFROM
 	EQUW	LAST
 	EQUW	PFA
@@ -2406,33 +2417,67 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	STORE
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	;CODE
+;
+;	> The use of this word requires the ASSEMBLER vocabulary to be loaded.
+;	> Use in the form
+;	>
+;	> : NNNN ... ;CODE ... (assembler words) ... END-CODE
+;	>
+;	> Compilation of the definition NNNN is terminated and ASSEMBLER
+;	> becomes the CONTEXT vocabulary. A defining word NNNN is created which
+;	> when executed in the form
+;	>
+;	> NNNN CCCC
+;	>
+;	> will create a new word CCCC. When CCCC is itself executed it action
+;	> will be determined by the machine code following ;CODE in NNNN .
+;
+; -----------------------------------------------------------------------------
 
 .L8D80	DEFIMM	";CODE"
 	EQUW	L8D68
 .L8D88	EQUW	DOCOLON
 	EQUW	QUERYCSP
 	EQUW	COMPILE
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 	EQUW	LBRAC
 	EQUW	ASSEM
 	EQUW	STORECSP
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;	 
 ;	DOES>
+;
+;	> Used with CREATE in the form:
+;	>
+;	> : NNNN CREATE ... DOES> ... ;
+;	>
+;	> It creates a new defining word NNNN . Executing NNNN in the form
+;	>
+;	> NNNN CCCC
+;	>
+;	> creates a new word CCCC whose parameter area is allocated by the
+;	> words following CREATE and whose action is governed by the words
+;	> following DOES> in NNNN .
+;
+; -----------------------------------------------------------------------------
 
 .L8D98	DEFIMM	"DOES>"
 	EQUW	L8D80
 .DOES	EQUW	DOCOLON
 	EQUW	COMPILE
-	EQUW	PSCOD
+	EQUW	BRACKETSEMICOLONCODE
 	EQUW	LIT,$20
 	EQUW	CCOMMA
 	EQUW	COMPILE
-	EQUW	DODOE
+	EQUW	DODOES
 	EQUW	EXIT
 
-.DODOE	DEX
+.DODOES	DEX
 	DEX
 	CLC
 	LDA	W
@@ -2901,11 +2946,18 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	SPACE
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	(CREATE)
+;
+;	> See CREATE .
+;
+; -----------------------------------------------------------------------------
 
 .L914F	DEFWORD	"(CREATE)"
 	EQUW	L911D
-.PCREAT	EQUW	DOCOLON
+.BRACKETCREATE
+	EQUW	DOCOLON
 	EQUW	FIRST
 	EQUW	HERE
 	EQUW	LIT,$A0
@@ -3177,7 +3229,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	L9329
 .VOCABULARY
 	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	LIT,$A081
 	EQUW	COMMA
 	EQUW	CURRENT
@@ -3190,8 +3242,8 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	COMMA
 	EQUW	VOCLINK
 	EQUW	STORE
-	EQUW	PSCOD
-.DOVOC	JSR	DODOE
+	EQUW	BRACKETSEMICOLONCODE
+.DOVOC	JSR	DODOES
 	EQUW	TWOPLUS
 	EQUW	CONTEXT
 	EQUW	STORE
@@ -4264,7 +4316,8 @@ ENDIF
 
 ;	VLIST
 
-.L9967	DEFWORD	"VLIST"
+.VLIST_NFA
+	DEFWORD	"VLIST"
 	EQUW	L9951
 .VLIST	EQUW	DOCOLON
 	EQUW	LIT,128
@@ -4308,25 +4361,58 @@ ENDIF
 	EQUW	DROP
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	NOVEC
+;
+;	> The action assigned to a newly-created execution vector. See
+;	> EXCVEC: .
+;
+; -----------------------------------------------------------------------------
 
-.L99CF	DEFWORD	"NOVEC"
-	EQUW	L9967
+.NOVEC_NFA
+	DEFWORD	"NOVEC"
+	EQUW	VLIST_NFA
 .NOVEC	EQUW	DOCOLON
 	EQUW	LIT,12
 	EQUW	ERROR
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	EXVEC:
+;
+;	> Used in the form:
+;	>
+;	> EXVEC: NNNN
+;	>
+;	> It creates an execution-vectored word NNNN , initially assigned to
+;	> execute NOVEC which gives an error message. The action of NNNN should
+;	> then be assigned to execute some other word CCCC by the use of
+;	>
+;	> ASSIGN NNNN TO-DO CCCC
+;	>
+;	> The action of NNNN may be reassigned at any time, when all previously
+;	> compiled uses of NNNN will be changed to the new assignment.
+;
+;	: EXVEC:
+;	 CREATE
+;	  [ FIND NOVEC ] LITERAL
+;	 DOES>
+;	  @EXECUTE
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L99E1	DEFWORD	"EXVEC:"
-	EQUW	L99CF
-.XVEC	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	NOVEC_NFA
+.EXVEC	EQUW	DOCOLON
+	EQUW	CREATE
 	EQUW	LIT,NOVEC
 	EQUW	COMMA
-	EQUW	PSCOD
-.DOXVEC	JSR	DODOE
+	EQUW	BRACKETSEMICOLONCODE
+.DOEXVEC
+	JSR	DODOES
 	EQUW	FETCHEXECUTE
 	EQUW	EXIT
 
@@ -4376,8 +4462,8 @@ ENDIF
 	EQUW	LIT,PKEY
 	EQUW	LIT,KEY+2
 	EQUW	STORE
-	EQUW	LIT,PCREAT
-	EQUW	LIT,CREAT+2
+	EQUW	LIT,BRACKETCREATE
+	EQUW	LIT,CREATE+2
 	EQUW	STORE
 	EQUW	LIT,PNUM
 	EQUW	LIT,NUM+2
@@ -5077,7 +5163,7 @@ ENDIF
 
 .L9FFB	DEFWORD	"EMIT"
 	EQUW	L846A
-.XEMIT	EQUW	DOXVEC
+.XEMIT	EQUW	DOEXVEC
 	EQUW	PEMIT
 
 EMIT	=	XEMIT-REL
@@ -5086,7 +5172,7 @@ EMIT	=	XEMIT-REL
 
 .LA006	DEFWORD	"KEY"
 	EQUW	L85D7
-.XKEY	EQUW	DOXVEC
+.XKEY	EQUW	DOEXVEC
 	EQUW	PKEY
 
 KEY	=	XKEY-REL
@@ -5109,20 +5195,34 @@ FIRST	=	XFIRS-REL
 
 LIMIT	=	XLIMI-REL
 
+; -----------------------------------------------------------------------------
+;
 ;	CREATE
+;
+;	> A vectored routine initialised on a cold start to execute (CREATE)
+;	> which creates a new dictionary header. Used as
+;	>
+;	> CREATE CCCC
+;	>
+;	> to create a dictionary header for the word CCCC with the code pointer
+;	> of VARIABLE . Later execution of CCCC will therefore leave the
+;	> address of the first byte of its parameter field. See also DOES> .
+;
+; -----------------------------------------------------------------------------
 
 .LA028	DEFWORD	"CREATE"
 	EQUW	L914F
-.XCREA	EQUW	DOXVEC
-	EQUW	PCREAT
+.XCREATE
+	EQUW	DOEXVEC
+	EQUW	BRACKETCREATE
 
-CREAT	=	XCREA-REL
+CREATE	=	XCREATE-REL
 
 ;	NUM
 
 .LA035	DEFWORD	"NUM"
 	EQUW	L92F9
-.XNUM	EQUW	DOXVEC
+.XNUM	EQUW	DOEXVEC
 	EQUW	PNUM
 
 NUM	=	XNUM-REL
@@ -5142,7 +5242,7 @@ FORTH	=	XFORT-REL
 
 .LA04F	DEFWORD	"ABORT"
 	EQUW	L9403
-.XABOR	EQUW	DOXVEC
+.XABOR	EQUW	DOEXVEC
 	EQUW	BRACKETABORT
 
 ABORT	=	XABOR-REL
@@ -5151,7 +5251,7 @@ ABORT	=	XABOR-REL
 
 .LA05B	DEFWORD	"MESSAGE"
 	EQUW	L97EA
-.XMES	EQUW	DOXVEC
+.XMES	EQUW	DOEXVEC
 	EQUW	SMSG
 
 MESS	=	XMES-REL
@@ -5200,7 +5300,7 @@ FNAME	=	XFNAME-REL
 .LA0A5	DEFWORD	"R/W"
 	EQUW	L9DCF
 .XRSLASHW
-	EQUW	DOXVEC
+	EQUW	DOEXVEC
 	EQUW	DRSW
 
 RSLASHW	=	XRSLASHW-REL
@@ -5257,7 +5357,7 @@ SHARPBUF	=	XSHARPBUF-REL
 .LA0E8	DEFWORD	"UPDATE"
 	EQUW	L9EEA
 .XUPDATE
-	EQUW	DOXVEC
+	EQUW	DOEXVEC
 	EQUW	PUPDA
 
 UPDATE	=	XUPDATE-REL
@@ -5988,10 +6088,10 @@ EDITOR	=	XEDIT-REL
 .LA6F4	DEFWORD	"SOP"
 	EQUW	LA6A2
 .SOP	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	CCOMMA
-	EQUW	PSCOD
-.DOSOP	JSR	DODOE
+	EQUW	BRACKETSEMICOLONCODE
+.DOSOP	JSR	DODOES
 	EQUW	CFETCH
 	EQUW	CCOMMA
 	EQUW	AMEM
@@ -6177,11 +6277,11 @@ EDITOR	=	XEDIT-REL
 .LA807	DEFWORD	"MOP"
 	EQUW	LA7FD
 .MOP	EQUW	DOCOLON
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	CCOMMA
 	EQUW	COMMA
-	EQUW	PSCOD
-.DOMOP	JSR	DODOE
+	EQUW	BRACKETSEMICOLONCODE
+.DOMOP	JSR	DODOES
 	EQUW	DUP
 	EQUW	ONEPLUS
 	EQUW	FETCH
@@ -6610,7 +6710,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	LA52C
 .CODE	EQUW	DOCOLON
 	EQUW	QUERYEXEC
-	EQUW	CREAT
+	EQUW	CREATE
 	EQUW	HERE
 	EQUW	HERE
 	EQUW	TWOMINUS

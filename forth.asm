@@ -1791,9 +1791,18 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	DOCONSTANT
 	EQUW	64
 
-;	PAD
+; -----------------------------------------------------------------------------
+;
+;	PAD   ( ... addr )
+;
+;	> A constant which leaves the address of the start of the text
+;	> scratchpad buffer. Numeric output characters are stored downwards
+;	> from PAD , character text is stored upwards.
+;
+; -----------------------------------------------------------------------------
 
-.L89D6	DEFWORD	"PAD"
+.PAD_NFA
+	DEFWORD	"PAD"
 	EQUW	L89CC
 .PAD	EQUW	DOCONSTANT
 	EQUW	PADD
@@ -3907,7 +3916,7 @@ ENDIF
 
 .L9695	DEFWORD	"M/MOD"
 	EQUW	L9686
-.MSLMOD	EQUW	DOCOLON
+.MSLASHMOD	EQUW	DOCOLON
 	EQUW	TOR
 	EQUW	ZERO
 	EQUW	RFETCH
@@ -3921,9 +3930,10 @@ ENDIF
 
 ;	SPACES
 
-.L96B3	DEFWORD	"SPACES"
+.SPACES_NFA
+	DEFWORD	"SPACES"
 	EQUW	L9695
-.SPACS	EQUW	DOCOLON
+.SPACES	EQUW	DOCOLON
 	EQUW	ZERO
 	EQUW	MAX
 	EQUW	QUERYDUP
@@ -3934,11 +3944,19 @@ ENDIF
 	EQUW	BRACKETULOOP,$FFFC
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	<#
+;
+;	> Sets up for numeric output formatting. The conversion is performed
+;	> on a double number to produce text at PAD . See also #, #>, #S ,
+;	> SIGN .
+;
+; -----------------------------------------------------------------------------
 
 .LESSSHARP_NFA
 	DEFWORD	"<#"
-	EQUW	L96B3
+	EQUW	SPACES_NFA
 .LESSSHARP
 	EQUW	DOCOLON
 	EQUW	PAD
@@ -3946,7 +3964,20 @@ ENDIF
 	EQUW	STORE
 	EQUW	EXIT
 
-;	#>
+; -----------------------------------------------------------------------------
+;
+;	#>   ( nd ... addr\count )
+;
+;	> Terminates numeric output conversion by dropping the double number nd
+;	> and leaving the address and the character count of the converted
+;	> string in a form suitable for TYPE .
+;
+;	: #>
+;	 2DROP
+;	 HLD @   PAD   OVER - 
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .SHARPGREATER_NFA
 	DEFWORD	"#>"
@@ -3961,11 +3992,12 @@ ENDIF
 	EQUW	MINUS
 	EQUW	EXIT
 
-	EQUB	$66
+	EQUB	$66		; UNUSED
 
 ;	SIGN
 
-.L96F9	DEFWORD	"SIGN"
+.SIGN_NFA
+	DEFWORD	"SIGN"
 	EQUW	SHARPGREATER_NFA
 .SIGN	EQUW	DOCOLON
 	EQUW	ROT
@@ -3975,15 +4007,33 @@ ENDIF
 	EQUW	HOLD
 	EQUW	EXIT
 
-;	#
+; -----------------------------------------------------------------------------
+;
+;	#   ( nd1 ... nd2 )
+;
+;	> Converts the least-significant digit (in the current base) of the
+;	> double-precision number nd1 to the corresponding ASCII character,
+;	> which it then stores at PAD . The remaining part of the number is
+;	> left as nd2 for further conversions. # is used between <# and #> .
+;
+;	: #
+;	 BASE @   M/MOD   ROT
+;	 9 OVER   < IF
+;	  7 +
+;	 THEN
+;	 [ CHAR 0 ] +
+;	 HOLD
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .SHARP_NFA
 	DEFWORD	"#"
-	EQUW	L96F9
+	EQUW	SIGN_NFA
 .SHARP	EQUW	DOCOLON
 	EQUW	BASE
 	EQUW	FETCH
-	EQUW	MSLMOD
+	EQUW	MSLASHMOD
 	EQUW	ROT
 	EQUW	LIT,9
 	EQUW	OVER
@@ -3996,11 +4046,29 @@ ENDIF
 	EQUW	HOLD
 	EQUW	EXIT
 
-;	#S
+; -----------------------------------------------------------------------------
+;
+;	#S   ( n1 ... n2 )
+;
+;	> Converts the double-precision number nd1 into ASCII text by repeated
+;	> use of # , and stores the text at PAD . The double-precision number
+;	> nd2 is left on the stack, and has the value zero. #S is used  between
+;	> <# and #> .
+;
+;	: #S
+;	 BEGIN
+;	  #
+;	  2DUP OR
+;	  0=
+;	 UNTIL
+;	;
+;
+; -----------------------------------------------------------------------------
 
-.L973C	DEFWORD	"#S"
+.SHARPS_NFA
+	DEFWORD	"#S"
 	EQUW	SHARP_NFA
-.DIGS	EQUW	DOCOLON
+.SHARPS	EQUW	DOCOLON
 	EQUW	SHARP
 	EQUW	TWODUP
 	EQUW	OR
@@ -4011,20 +4079,20 @@ ENDIF
 ;	D.R
 
 .L9751	DEFWORD	"D.R"
-	EQUW	L973C
+	EQUW	SHARPS_NFA
 .DDOTR	EQUW	DOCOLON
 	EQUW	TOR
 	EQUW	SWAP
 	EQUW	OVER
 	EQUW	DABS
 	EQUW	LESSSHARP
-	EQUW	DIGS
+	EQUW	SHARPS
 	EQUW	SIGN
 	EQUW	SHARPGREATER
 	EQUW	RFROM
 	EQUW	OVER
 	EQUW	MINUS
-	EQUW	SPACS
+	EQUW	SPACES
 	EQUW	TYPE
 	EQUW	EXIT
 
@@ -4818,7 +4886,21 @@ ENDIF
 	EQUW	DROP
 	EQUW	EXIT
 
-;	($+)
+; -----------------------------------------------------------------------------
+;
+;	($+)   ( addr1\count\addr2 ... )
+;
+;	> The string of length 'count' whose first character is at addr1 is
+;	> added to the end of the string whose count byte is at addr2 (i.e.
+;	> whose first character is at addr2+1). The count byte at addr2 is
+;	> incremented to be the new length of the concatenated string.
+;
+;	: ($+)
+;	 SWAP  >R   SWAP   OVER   COUNT   DUP   R@
+;	 PLUS   5 ROLL   C!   +   R>   CMOVE
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETDOLLARPLUS_NFA
 	DEFWORD	"($+)"
@@ -4927,8 +5009,11 @@ ENDIF
 ;	  THEN
 ;	 THEN
 ;	 0
+;	 ( build the string KEY##" where ## is the number )
 ;	 <# [ CHAR " ] HOLD # # [ CHAR Y ] HOLD [ CHAR E ] HOLD [ CHAR K ] HOLD #>
-;	 PAD 2DUP C! 1+ SWAP   CMOVE
+;	 ( copy to PAD )
+;	 PAD   2DUP C!   1+ SWAP CMOVE
+;	 ( read specified string until single quote )
 ;	 [ CHAR ' ] LITERAL STRING
 ;	 ?DUP IF
 ;	  PAD ($+)
@@ -4981,7 +5066,7 @@ ENDIF
 	EQUW	ONEPLUS
 	EQUW	SWAP
 	EQUW	CMOVE
-	EQUW	LIT,$27
+	EQUW	LIT,'''
 	EQUW	STRING
 	EQUW	QUERYDUP
 	EQUW	ZEROBRANCH,6
@@ -5358,7 +5443,7 @@ KEY	=	XKEY-REL
 ;	FIRST
 
 .LA010	DEFWORD	"FIRST"
-	EQUW	L89D6
+	EQUW	PAD_NFA
 .XFIRS	EQUW	DOCONSTANT
 	EQUW	BUF1
 
@@ -5956,7 +6041,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	DUP
 	EQUW	DOT
 	EQUW	LIT,5
-	EQUW	SPACS
+	EQUW	SPACES
 	EQUW	HDOT
 	EQUW	BRACKETDOTQUOTE
 	EQUB	1,'H'
@@ -7093,7 +7178,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	WBFR
 	EQUW	CFETCH
 	EQUW	MINUS
-	EQUW	SPACS
+	EQUW	SPACES
 	EQUW	LIT,$5E
 	EQUW	EMIT
 	EQUW	EDITOR

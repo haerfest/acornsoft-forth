@@ -55,12 +55,17 @@ LineFeed		=	$0A
 CarriageReturn		=	$0D
 EscapeFlag		=	$FF
 EscapeKey		=	27
-ClearEscapeCondition	=	$7E
-ReadDisplayAddr		=	$85
-ReadHighOrderAddr	=	$82
-EnterLanguageRom	=	$8E
 PrintStrPtr		=	$12
 JmpIndirectOpcode	=	$6C
+
+ClearEscapeCondition	=	$7E
+EnterLanguageRom	=	$8E
+FlushBufferClass	=	$0F
+ReadDisplayAddr		=	$85
+ReadHighOrderAddr	=	$82
+ReadKeyWithTimeLimit	=	$81
+SetKeyboardRepeatDelay	=	$0B
+SetKeyboardRepeatPeriod	=	$0C
 
 ; -----------------------------------------------------------------------------
 
@@ -716,10 +721,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	(FIND)
 
-.PFIND_NFA
+.BRACKETFIND_NFA
 	DEFWORD	"(FIND)"
 	EQUW	DIGIT_NFA
-.PFIND
+.BRACKETFIND
 	EQUW	*+2
 	LDA	#2
 	JSR	SETUP
@@ -778,7 +783,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 .ENCLOSE_NFA
 	DEFWORD	"ENCLOSE"
-	EQUW	PFIND_NFA
+	EQUW	BRACKETFIND_NFA
 .ENCLOSE
 	EQUW	*+2
 	LDA	#2
@@ -1058,38 +1063,61 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	INX
 	JMP	PUT
 
-;	?KEY
+; -----------------------------------------------------------------------------
+;
+;	?KEY   ( n1 ... n2 )
+;
+;	> Flushes the keyboard buffer of all characters and tests if a key is
+;	> being pressed. There are two cases:
+;	>
+;	> 1) If n1 is positive, i.e. in the range 0 to 32767 inclusive, ?KEY
+;	>    will will wait for up to n1 hundredths of a second, constantly
+;	>    testing to see if a key has been pressed. If a key is pressed
+;	>    within the time limit its ASCII value will be returned as n2. If
+;	>    the time limit expires before a key is pressed a negative number
+;	>    will be returned as n2.
+;	>
+;	> 2) If n1 is negative a test will be made to see if a particular key
+;	>    is pressed at the instant ?KEY is called. The value of n1
+;	>    determines which key is to be tested according to the table given
+;	>    in the description of INKEY in the BBC Microcomputer User Guide
+;	>    (page 275). If the key is pressed n2 will be returned as -1,
+;	>    otherwise n2 will be zero. These may be treated as true and false
+;	>    flags respectively.
+;
+; -----------------------------------------------------------------------------
 
 .L858F	DEFWORD	"?KEY"
 	EQUW	L8579
-.QUERYKEY	EQUW	*+2
+.QUERYKEY
+	EQUW	*+2
 	STX	XSAVE
-	LDX	#1
-	LDA	#$C
+	LDX	#1			; 1/100th second
+	LDA	#SetKeyboardRepeatPeriod
 	JSR	OSBYTE
-	STX	N
-	LDX	#0
-	LDA	#$B
+	STX	N			; save previous value
+	LDX	#0			; 0/100th second
+	LDA	#SetKeyboardRepeatDelay
 	JSR	OSBYTE
-	STX	N+1
-	LDX	#1
-	LDA	#$F
+	STX	N+1			; save previous value
+	LDX	#1			; input buffer
+	LDA	#FlushBufferClass
 	JSR	OSBYTE
 	LDX	XSAVE
 	LDY	1,X
 	LDA	0,X
 	TAX
-	LDA	#$81
+	LDA	#ReadKeyWithTimeLimit
 	JSR	OSBYTE
 	TXA
 	PHA
 	TYA
 	PHA
-	LDX	N
-	LDA	#$C
+	LDX	N			; restore previous value
+	LDA	#SetKeyboardRepeatPeriod
 	JSR	OSBYTE
-	LDX	N+1
-	LDA	#$B
+	LDX	N+1			; restore previous value
+	LDA	#SetKeyboardRepeatDelay
 	JSR	OSBYTE
 	PLA
 	LDX	XSAVE
@@ -2950,7 +2978,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	BL
 	EQUW	ONEWRD
 	EQUW	SWAP
-	EQUW	PFIND
+	EQUW	BRACKETFIND
 	EQUW	EXIT
 
 ;	FIND
@@ -3050,7 +3078,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	CONTEXT
 	EQUW	FETCH
 	EQUW	FETCH
-	EQUW	PFIND
+	EQUW	BRACKETFIND
 	EQUW	ZEROBRANCH,$12
 	EQUW	DROP
 	EQUW	TWOPLUS

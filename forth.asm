@@ -63,9 +63,15 @@ EnterLanguageRom	=	$8E
 FlushBufferClass	=	$0F
 ReadDisplayAddr		=	$85
 ReadHighOrderAddr	=	$82
+ReadHimem		=	$84
 ReadKeyWithTimeLimit	=	$81
+ReadHighWaterMark	=	$83
 SetKeyboardRepeatDelay	=	$0B
 SetKeyboardRepeatPeriod	=	$0C
+
+OpenFileInputOutput	=	$C0
+
+ReadLine		=	$00
 
 ; -----------------------------------------------------------------------------
 
@@ -616,7 +622,16 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	SBC	$102,X
 	JMP	L8244
 
-;	I
+; -----------------------------------------------------------------------------
+;
+;	I   ( ... n )
+;
+;	> Used in a DO ... LOOP to place the current value of the loop index on
+;	> the stack. It must be used at the same level of nesting as the DO ...
+;	> LOOP i.e. it will not operate correctly if included in a colon-
+;	> definition word between DO and LOOP .
+;
+; -----------------------------------------------------------------------------
 
 .IDO_NFA
 	DEFWORD	"I"
@@ -1051,9 +1066,10 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 
 ;	XOR
 
-.L8579	DEFWORD	"XOR"
+.XOR_NFA
+	DEFWORD	"XOR"
 	EQUW	L8564
-.XORR	EQUW	*+2
+.XOR	EQUW	*+2
 	LDA	0,X
 	EOR	2,X
 	PHA
@@ -1087,47 +1103,63 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L858F	DEFWORD	"?KEY"
-	EQUW	L8579
+.QUERYKEY_NFA
+	DEFWORD	"?KEY"
+	EQUW	XOR_NFA
 .QUERYKEY
 	EQUW	*+2
 	STX	XSAVE
+
 	LDX	#1			; 1/100th second
 	LDA	#SetKeyboardRepeatPeriod
 	JSR	OSBYTE
 	STX	N			; save previous value
+
 	LDX	#0			; 0/100th second
 	LDA	#SetKeyboardRepeatDelay
 	JSR	OSBYTE
 	STX	N+1			; save previous value
+
 	LDX	#1			; input buffer
 	LDA	#FlushBufferClass
 	JSR	OSBYTE
+	
 	LDX	XSAVE
 	LDY	1,X
 	LDA	0,X
 	TAX
 	LDA	#ReadKeyWithTimeLimit
 	JSR	OSBYTE
+	
 	TXA
 	PHA
 	TYA
 	PHA
+	
 	LDX	N			; restore previous value
 	LDA	#SetKeyboardRepeatPeriod
 	JSR	OSBYTE
+	
 	LDX	N+1			; restore previous value
 	LDA	#SetKeyboardRepeatDelay
 	JSR	OSBYTE
+	
 	PLA
 	LDX	XSAVE
 	JMP	PUT
 
-;	(KEY)
+; -----------------------------------------------------------------------------
+;
+;	(KEY)   ( ... c)
+;
+;	> See KEY .
+;
+; -----------------------------------------------------------------------------
 
 .L85D7	DEFWORD	"(KEY)"
-	EQUW	L858F
-.BRACKETKEY	EQUW	*+2
+	EQUW	QUERYKEY_NFA
+.BRACKETKEY
+	EQUW	*+2
 	JSR	OSRDCH
 	JMP	PUSH0A
 
@@ -1142,7 +1174,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .L85E7	DEFWORD	"EXIT"
-	EQUW	LA006-REL
+	EQUW	KEY_NFA-REL
 .EXIT	EQUW	*+2
 	PLA			; IP := POP(R)
 	STA	IP
@@ -1150,7 +1182,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	IP+1
 	JMP	NEXT
 
-;	R@
+; -----------------------------------------------------------------------------
+;
+;	R@   ( ... n )
+;
+;	> Copy the top of the return stack to the computation stack. The action
+;	> is identical to that of I .
+;
+; -----------------------------------------------------------------------------
 
 .RFETCH_NFA
 	DEFWORD	"R@"
@@ -1520,7 +1559,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	TRAVERSE_NFA
 .PAGE	EQUW	*+2
 	STX	XSAVE
-	LDA	#$83
+	LDA	#ReadHighWaterMark
 	JSR	OSBYTE
 	TXA
 	PHA
@@ -1534,7 +1573,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	L8843
 .HIMEM	EQUW	*+2
 	STX	XSAVE
-	LDA	#$84
+	LDA	#ReadHimem
 	JSR	OSBYTE
 	TXA
 	PHA
@@ -2738,7 +2777,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	STA	3,X
 	LDA	#$FF
 	STA	4,X
-	LDA	#0
+	LDA	#ReadLine
 	JSR	OSWORD
 	LDX	XSAVE
 	STY	2,X
@@ -3844,7 +3883,7 @@ ENDIF
 	EQUW	L95D7
 .MSTAR	EQUW	DOCOLON
 	EQUW	TWODUP
-	EQUW	XORR
+	EQUW	XOR
 	EQUW	TOR
 	EQUW	ABS
 	EQUW	SWAP
@@ -3869,7 +3908,7 @@ ENDIF
 	EQUW	USLASHMOD
 	EQUW	RFROM
 	EQUW	RFETCH
-	EQUW	XORR
+	EQUW	XOR
 	EQUW	PM
 	EQUW	SWAP
 	EQUW	RFROM
@@ -5122,7 +5161,7 @@ ENDIF
 	LDY	1,X
 	LDA	0,X
 	TAX
-	LDA	#$C0
+	LDA	#OpenFileInputOutput
 	JSR	OSFIND
 	LDX	XSAVE
 	STA	0,X
@@ -5459,9 +5498,18 @@ ENDIF
 
 EMIT	=	XEMIT-REL
 
-;	KEY
+; -----------------------------------------------------------------------------
+;
+;	KEY   ( ... c )
+;
+;	> A vectored routine initialised on a cold start to execute (KEY) which
+;	> leaves the ASCII value of the next available character from the
+;	> current input device.
+;
+; -----------------------------------------------------------------------------
 
-.LA006	DEFWORD	"KEY"
+.KEY_NFA
+	DEFWORD	"KEY"
 	EQUW	L85D7
 .XKEY	EQUW	DOEXVEC
 	EQUW	BRACKETKEY
@@ -7294,12 +7342,12 @@ EDITOR	=	XEDIT-REL
 
 .LAD6B	DEFWORD	"S"
 	EQUW	LAD5B
-.SS	EQUW	DOCOLON
+.S	EQUW	DOCOLON
 	EQUW	DUP
 	EQUW	LIT,$FFF0
 	EQUW	AND
 	EQUW	NOT
-	EQUW	ZEROBRANCH,$1A
+	EQUW	ZEROBRANCH,26
 	EQUW	DUP
 	EQUW	LIT,$E
 	EQUW	XDO
@@ -7309,7 +7357,7 @@ EDITOR	=	XEDIT-REL
 	EQUW	ONEPLUS
 	EQUW	DMOVE
 	EQUW	MINUSONE
-	EQUW	BRACKETPLUSLOOP,$FFF2
+	EQUW	BRACKETPLUSLOOP,-14
 	EQUW	EE
 	EQUW	EXIT
 
@@ -7388,7 +7436,7 @@ EDITOR	=	XEDIT-REL
 
 .LAE1B	DEFWORD	"R"
 	EQUW	LAE09
-.RR	EQUW	DOCOLON
+.R	EQUW	DOCOLON
 	EQUW	PAD
 	EQUW	ONEPLUS
 	EQUW	SWAP
@@ -7402,24 +7450,23 @@ EDITOR	=	XEDIT-REL
 .PP	EQUW	DOCOLON
 	EQUW	ONE
 	EQUW	TEXT
-	EQUW	RR
+	EQUW	R
 	EQUW	EXIT
 
-;	I
-
-.LAE39	DEFWORD	"I"
+.I_NFA	DEFWORD	"I"
 	EQUW	LAE2B
-.II	EQUW	DOCOLON
+.I	EQUW	DOCOLON
 	EQUW	DUP
-	EQUW	SS
-	EQUW	RR
+	EQUW	S
+	EQUW	R
 	EQUW	EXIT
 
 ;	TOP
 
-.LAE47	DEFWORD	"TOP"
-	EQUW	LAE39
-.TOPP	EQUW	DOCOLON
+.TOP_NFA
+	DEFWORD	"TOP"
+	EQUW	I_NFA
+.TOP	EQUW	DOCOLON
 	EQUW	ZERO
 	EQUW	RSHARP
 	EQUW	STORE
@@ -7428,7 +7475,7 @@ EDITOR	=	XEDIT-REL
 ;	CLEAR
 
 .LAE57	DEFWORD	"CLEAR"
-	EQUW	LAE47
+	EQUW	TOP_NFA
 .CLEAR	EQUW	DOCOLON
 	EQUW	SCR
 	EQUW	STORE
@@ -7533,15 +7580,16 @@ EDITOR	=	XEDIT-REL
 
 ;	$FIND
 
-.LAF20	DEFWORD	"$FIND"
+.DOLLARFIND_NFA	DEFWORD	"$FIND"
 	EQUW	LAF08
-.SFIND	EQUW	DOCOLON
+.DOLLARFIND
+	EQUW	DOCOLON
 	EQUW	LIT,$3FF
 	EQUW	RSHARP
 	EQUW	FETCH
 	EQUW	LESS
 	EQUW	ZEROBRANCH,$12
-	EQUW	TOPP
+	EQUW	TOP
 	EQUW	PAD
 	EQUW	HERE
 	EQUW	CSLASHL
@@ -7555,8 +7603,9 @@ EDITOR	=	XEDIT-REL
 
 ;	DELETE
 
-.LAF50	DEFWORD	"DELETE"
-	EQUW	LAF20
+.DELETE_NFA
+	DEFWORD	"DELETE"
+	EQUW	DOLLARFIND_NFA
 .DELETE	EQUW	DOCOLON
 	EQUW	TOR
 	EQUW	SHARPLAG
@@ -7580,9 +7629,9 @@ EDITOR	=	XEDIT-REL
 ;	N
 
 .LAF7F	DEFWORD	"N"
-	EQUW	LAF50
+	EQUW	DELETE_NFA
 .NN	EQUW	DOCOLON
-	EQUW	SFIND
+	EQUW	DOLLARFIND
 	EQUW	ZERO
 	EQUW	EMM
 	EQUW	EXIT
@@ -7615,7 +7664,7 @@ EDITOR	=	XEDIT-REL
 .XX	EQUW	DOCOLON
 	EQUW	ONE
 	EQUW	TEXT
-	EQUW	SFIND
+	EQUW	DOLLARFIND
 	EQUW	PAD
 	EQUW	CFETCH
 	EQUW	DELETE

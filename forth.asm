@@ -1989,6 +1989,8 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;	> addr, whose contents point to the first free byte at the top of the
 ;	> dictionary.
 ;
+;	HEX 12 USER DP
+;
 ; -----------------------------------------------------------------------------
 
 .DP_NFA	DEFWORD	"DP"
@@ -1996,9 +1998,20 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 .DP	EQUW	DOUSER
 	EQUB	$12
 
-;	VOC-LINK
+; -----------------------------------------------------------------------------
+;
+;	VOC-LINK   ( ... addr )
+;
+;	> A user variable containing the address of a vocabulary link field in
+;	> the word which defines the most recently created vocabulary. All
+;	> vocabularies are linked through these fields in their defining words.
+;
+;	HEX 14 USER VOC-LINK
+;
+; -----------------------------------------------------------------------------
 
-.L8A50	DEFWORD	"VOC-LINK"
+.VOCLINK_NFA
+	DEFWORD	"VOC-LINK"
 	EQUW	DP_NFA
 .VOCLINK
 	EQUW	DOUSER
@@ -2007,7 +2020,7 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 ;	BLK
 
 .L8A5E	DEFWORD	"BLK"
-	EQUW	L8A50
+	EQUW	VOCLINK_NFA
 .BLK	EQUW	DOUSER
 	EQUB	$16
 
@@ -3365,14 +3378,46 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	BRANCH,-42
 	EQUW	EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;	VOCABULARY
+;
+;	> A defining word used in the form:
+;	>
+;	> VOCABULARY CCCC
+;	>
+;	> It creates a defining word for a vocabulary with name CCCC .
+;	> Execution of CCCC makes it the CONTEXT vocabulary in which a
+;	> dictionary search will start. Execution of the sequence
+;	>
+;	> CCCC DEFINITIONS
+;	>
+;	> will make CCCC the CURRENT vocabulary into which new definitions are
+;	> placed. Vocabulary CCCC is so linked that a dictionary search will
+;	> also find all words in the vocabulary in which CCCC was originally
+;	> defined. All vocabularies, therefore, ultimately link to FORTH .
+;	>
+;	> By convention all vocabulary defining words are declared IMMEDIATE .
+;
+;	: VOCABULARY
+;	 CREATE
+;	  [ HEX ] A081  ,
+;	  CURRENT @ CFA ,
+;	  HERE   VOC-LINK @ ,   VOC-LINK !
+;	 DOES>
+;	  2+ CONTEXT !
+;	;
+;
+; -----------------------------------------------------------------------------
 
-.L9365	DEFWORD	"VOCABULARY"
+.VOCABULARY_NFA
+	DEFWORD	"VOCABULARY"
 	EQUW	L9329
 .VOCABULARY
 	EQUW	DOCOLON
 	EQUW	CREATE
-	EQUW	LIT,$A081
+	EQUW	LIT
+	DEFWORD	" "
 	EQUW	COMMA
 	EQUW	CURRENT
 	EQUW	FETCH
@@ -3385,7 +3430,9 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	VOCLINK
 	EQUW	STORE
 	EQUW	BRACKETSEMICOLONCODE
-.DOVOC	JSR	DODOES
+
+.DOVOCABULARY
+	JSR	DODOES
 	EQUW	TWOPLUS
 	EQUW	CONTEXT
 	EQUW	STORE
@@ -5569,9 +5616,9 @@ NUM	=	XNUM-REL
 ;	FORTH
 
 .LA03F	DEFIMM	"FORTH"
-	EQUW	L9365
-.XFORT	EQUW	DOVOC
-	EQUW	$A081
+	EQUW	VOCABULARY_NFA
+.XFORT	EQUW	DOVOCABULARY
+	DEFWORD	" "
 	EQUW	TOPNFA
 .VL0	EQUW	0
 
@@ -5758,9 +5805,9 @@ SSV	=	XSSV-REL
 .LA16E	DEFIMM	"ASSEMBLER"
 	EQUW	LA4F6
 .XASSEMBLER
-	EQUW	DOVOC
-	EQUW	$A081
-	EQUW	LAB1C
+	EQUW	DOVOCABULARY
+	DEFWORD " "
+	EQUW	ENDCODE_NFA
 .LA180	EQUW	VL0-REL
 
 ASSEMBLER	=	XASSEMBLER-REL
@@ -5774,17 +5821,23 @@ ASSEMBLER	=	XASSEMBLER-REL
 
 AMODE	=	XMOD-REL
 
+; -----------------------------------------------------------------------------
+;
 ;	EDITOR
+;
+; -----------------------------------------------------------------------------
 
-.LA18D	DEFIMM	"EDITOR"
+.EDITOR_NFA
+	DEFIMM	"EDITOR"
 	EQUW	LAB39
-.XEDIT	EQUW	DOVOC
-	EQUW	$A081
-	EQUW	LAFEC
+.XEDITOR
+	EQUW	DOVOCABULARY
+	DEFWORD	" "
+	EQUW	C_NFA
 	EQUW	LA180-REL
 	EQUB	0
 
-EDITOR	=	XEDIT-REL
+EDITOR	=	XEDITOR-REL
 
 ; END OF BLOCK RELOCATED TO RAM
 
@@ -7050,9 +7103,10 @@ EDITOR	=	XEDIT-REL
 
 ;	END-CODE
 
-.LAB1C	DEFIMM	"END-CODE"
+.ENDCODE_NFA
+	DEFIMM	"END-CODE"
 	EQUW	LAB08
-.ENDCOD	EQUW	DOCOLON
+	EQUW	DOCOLON
 	EQUW	CURRENT
 	EQUW	FETCH
 	EQUW	CONTEXT
@@ -7082,7 +7136,7 @@ EDITOR	=	XEDIT-REL
 ;	LOCATE
 
 .LAB58	DEFWORD	"LOCATE"
-	EQUW	LA18D-REL
+	EQUW	EDITOR_NFA-REL
 .LOCATE	EQUW	DOCOLON
 	EQUW	QUERYFILE
 	EQUW	LIT,4
@@ -7696,9 +7750,9 @@ EDITOR	=	XEDIT-REL
 
 ;	C
 
-.LAFEC	DEFWORD	"C"
+.C_NFA	DEFWORD	"C"
 	EQUW	LAFC3
-.CC	EQUW	DOCOLON
+	EQUW	DOCOLON
 	EQUW	ONE
 	EQUW	TEXT
 	EQUW	PAD

@@ -669,7 +669,17 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	INX
 	JMP	NEXT
 
-;	HIADDR
+; -----------------------------------------------------------------------------
+;
+;	HIADDR   ( ... n )
+;
+;	Pushes the machine's high order address onto the stack. The high order
+;	address represents the upper 16 bits of a 32-bit memory address
+;	(&NNNNxxxx), which is &0000 for a second processor connected to the
+;	TUBE interface, and &FFFF for the I/O processor, i.e. the BBC or
+;	Electron.
+;
+; -----------------------------------------------------------------------------
 
 .HIADDR_NFA
 	DEFWORD	"HIADDR"
@@ -685,7 +695,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	TYA
 	JMP	PUSH
 
-;	MODEADDR
+; -----------------------------------------------------------------------------
+;
+;	MODEADDR   ( ... )
+;
+;	Pushes the address at which the current MODE's display memory starts,
+;	onto the stack, without adjusting the stack pointer afterwards.
+;
+; -----------------------------------------------------------------------------
 
 .MODEADDR_NFA
 	DEFWORD	"MODEADDR"
@@ -924,7 +941,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	JSR	OSWRCH
 	JMP	POP
 
-;	>VDU
+; -----------------------------------------------------------------------------
+;
+;	>VDU   ( n ... )
+;
+;	> Transmits the low byte of n to the VDU driver, without incrementing
+;	> OUT . See EMIT .
+;
+; -----------------------------------------------------------------------------
 
 .L848E	DEFWORD	">VDU"
 	EQUW	L9FFB-REL
@@ -933,7 +957,18 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	JSR	OSWRCH
 	JMP	POP
 
-;	CMOVE
+; -----------------------------------------------------------------------------
+;
+;	CMOVE   ( from\to\count ... )
+;
+;	> Moves 'count' bytes, starting at 'from' to the block of memory
+;	> starting at 'to'. The byte at 'from' is moved first and the
+;	> transfer proceeds towards high memory. No check is made as to
+;	> whether the destination area overlaps the source area. Nothing
+;	> is moved if 'count' is zero or negative.
+;
+; -----------------------------------------------------------------------------
+
 
 .L849F	DEFWORD	"CMOVE"
 	EQUW	L848E
@@ -1806,7 +1841,14 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	ADC	UP+1
 	JMP	PUSH
 
-;	-2
+; -----------------------------------------------------------------------------
+;
+;	-2   ( ... n )
+;
+;	> These often-used numerical values are defined as constants in the
+;	> dictionary to save both time and dictionary space.
+;
+; -----------------------------------------------------------------------------
 
 .L8999	DEFWORD	"-2"
 	EQUW	USER_NFA
@@ -1814,7 +1856,13 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	DOCONSTANT
 	EQUW	-2
 
-;	-1
+; -----------------------------------------------------------------------------
+;
+;	-1   ( ... n )
+;
+;	See -2.
+;
+; -----------------------------------------------------------------------------
 
 .L89A2	DEFWORD	"-1"
 	EQUW	L8999
@@ -1822,21 +1870,39 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	DOCONSTANT
 	EQUW	-1
 
-;	0
+; -----------------------------------------------------------------------------
+;
+;	0   ( ... n )
+;
+;	See -2.
+;
+; -----------------------------------------------------------------------------
 
 .L89AB	DEFWORD	"0"
 	EQUW	L89A2
 .ZERO	EQUW	DOCONSTANT
 	EQUW	0
 
-;	1
+; -----------------------------------------------------------------------------
+;
+;	1   ( ... n )
+;
+;	See -2.
+;
+; -----------------------------------------------------------------------------
 
 .L89B3	DEFWORD	"1"
 	EQUW	L89AB
 .ONE	EQUW	DOCONSTANT
 	EQUW	1
 
-;	2
+; -----------------------------------------------------------------------------
+;
+;	2   ( ... n )
+;
+;	See -2.
+;
+; -----------------------------------------------------------------------------
 
 .L89BB	DEFWORD	"2"
 	EQUW	L89B3
@@ -2855,7 +2921,21 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	DROP
 	EQUW	EXIT
 
-;	MOVE
+; -----------------------------------------------------------------------------
+;
+;	MOVE   ( from\to\count ... )
+;
+;	> Moves 'count' words (16-bit values) starting at 'from' to the block
+;	> of memory starting at 'to'. The 16-bit value at 'from' is moved
+;	> first and the transfer proceeds towards high memory. No check is
+;	> made as to whether the destination and source areas overlap. If
+;	> 'count' is zero or negative nothing is moved.
+;
+;	: MOVE
+;	 DUP + CMOVE  ( duplicate 'count' and call CMOVE )
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .L8F6D	DEFWORD	"MOVE"
 	EQUW	L8F33
@@ -3651,7 +3731,22 @@ BUF1	=	EM-BUFS		; FIRST BLOCK BUFFER
 	EQUW	PWARM
 	EQUW	EXIT
 
-;	MODE
+; -----------------------------------------------------------------------------
+;
+;	MODE   ( n ... )
+;
+;	> Sets the VDU display to mode n. In the tape or disk versions, only
+;	> modes 4-7 inclusive are allowed.
+;
+;	: MODE
+;	 HIADDR -1 = IF   ( check if we are on I/O processor )
+;	  DUP MODEADDR    ( DUP creates room for MODEADDR )
+;	  MOVE-BUFFERS
+;	 THEN
+;	 22 >VDU >VDU
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .MODE_NFA
 	DEFWORD	"MODE"
@@ -5563,7 +5658,15 @@ EMIT	=	XEMIT-REL
 
 KEY	=	XKEY-REL
 
-;	FIRST
+; -----------------------------------------------------------------------------
+;
+;	FIRST   ( ... addr )
+;
+;	> A constant that leaves the address addr of the first byte of the
+;	> mass storage buffer area.
+;
+; -----------------------------------------------------------------------------
+
 
 .LA010	DEFWORD	"FIRST"
 	EQUW	PAD_NFA
@@ -5572,7 +5675,14 @@ KEY	=	XKEY-REL
 
 FIRST	=	XFIRS-REL
 
-;	LIMIT
+; -----------------------------------------------------------------------------
+;
+;	LIMIT   ( ... addr )
+;
+;	> A constant leaving the address of the first byte after the highest
+;	> memory available for the mass storage buffers.
+;
+; -----------------------------------------------------------------------------
 
 .LA01C	DEFWORD	"LIMIT"
 	EQUW	LA010-REL
@@ -5711,7 +5821,14 @@ MINBUF	=	XMINBUF-REL
 
 BUFSZ	=	XBUFSZ-REL
 
-;	USE
+; -----------------------------------------------------------------------------
+;
+;	USE   ( ... addr )
+;
+;	> A variable containing the address of the mass storage buffer to use
+;	> next, as the last recently written.
+;
+; -----------------------------------------------------------------------------
 
 .LA0C8	DEFWORD	"USE"
 	EQUW	LA0BC-REL
@@ -5720,7 +5837,14 @@ BUFSZ	=	XBUFSZ-REL
 
 USE	=	XUSE-REL
 
-;	PREV
+; -----------------------------------------------------------------------------
+;
+;	PREV   ( ... addr )
+;
+;	> A variable containing a pointer to the start of the most recently
+;	> used mass storage buffer.
+;
+; -----------------------------------------------------------------------------
 
 .LA0D2	DEFWORD	"PREV"
 	EQUW	LA0C8-REL
@@ -7784,7 +7908,15 @@ EDITOR	=	XEDITOR-REL
 	EQUW	EMM
 	EQUW	EXIT
 
-;	<CMOVE
+; -----------------------------------------------------------------------------
+;
+;	<CMOVE   ( from\to\count ... )
+;
+;	> Its overall action is the same as that of CMOVE except that the byte
+;	> with the highest address is moved first and the transfer proceeds in
+;	> order of decreasing address.
+;
+; -----------------------------------------------------------------------------
 
 .LB02E	DEFWORD	"<CMOVE"
 	EQUW	LAC9F
@@ -7818,7 +7950,39 @@ EDITOR	=	XEDITOR-REL
 
 .LB068	JMP	NEXT
 
-;	MOVE-BUFFERS
+
+; -----------------------------------------------------------------------------
+;
+;	MOVE-BUFFERS   ( modeaddr ... )
+;
+;	Given the display memory address as retrieved by MODEADDR, moves the
+;	mass storage buffer area FIRST to its new location and upates PREV and
+;	USE accordingly.
+;
+;	: MOVE-BUFFERS
+;	 LIMIT	 2DUP -          ( calculate distance between MODEADDR-LIMIT )
+;	 ?DUP IF                 ( check if there is a non-zero distance )
+;	  FIRST OVER +           ( calculate new FIRST value to-be )
+;	  DUP HERE U< 25 ?ERROR  ( system memory clash if below HERE )
+;	  ROT FIRST -            ( calculate count of bytes to move )
+;	  >R  SWAP
+;	  DUP PREV +!            ( add distance to PREV ) 
+;	  DUP USE +!             ( add distance to USE  )
+;	  >R  FIRST              ( retrieve old FIRST )
+;	  OVER [ ' FIRST ] !     ( update FIRST with calculated value )
+;	  SWAP  R> R>  SWAP
+;	  0< IF                  ( check if distance is negative )
+;	   CMOVE                 ( move FIRST, first byte first )
+;	  ELSE
+;	   <CMOVE                ( move FIRST, last byte first )
+;	  THEN
+;	  [ ' LIMIT ] !          ( store MODEADDR as new LIMIT )
+;	 ELSE
+;	  2DROP                  ( no distance, nothing to do )
+;	 THEN
+;	;
+;
+; -----------------------------------------------------------------------------
 
 .LB06B	DEFWORD	"MOVE-BUFFERS"
 	EQUW	LB02E

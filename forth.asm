@@ -694,10 +694,10 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       MODEADDR   ( ... )
+;       MODEADDR   ( n ... addr )
 ;
-;       Pushes the address at which the current MODE's display memory starts,
-;       onto the stack, without adjusting the stack pointer afterwards.
+;       Given a screen MODE 'n', returns the address at which its video memory
+;       starts.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -3740,7 +3740,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       : MODE
 ;        HIADDR -1 = IF   ( check if we are on I/O processor )
-;         DUP MODEADDR    ( DUP creates room for MODEADDR )
+;         DUP MODEADDR
 ;         MOVE-BUFFERS
 ;        THEN
 ;        22 >VDU >VDU

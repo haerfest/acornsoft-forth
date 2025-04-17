@@ -307,7 +307,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    0               ; $1A +ORIGIN: initial WARNING
         EQUW    TOPDP           ; $1C +ORIGIN: initial FENCE
         EQUW    TOPDP           ; $1E +ORIGIN: initial DP
-        EQUW    VL0-REL                 ; $20 +ORIGIN: initial VOC-LINK
+        EQUW    VL0-REL         ; $20 +ORIGIN: initial VOC-LINK
         EQUW    1               ; $22 +ORIGIN: initial LK
 
         EQUB    "RdeG-H"        ; Author Richard de Grandis-Harrison
@@ -602,7 +602,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       (ULOOP)   ( ... )
+;       (ULOOP)
 ;
 ;       > The run-time procedure for an unsigned version of LOOP . It is used
 ;       > by the system for loops involving unsigned indices, for example,
@@ -909,7 +909,13 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         LDA     #1
         JMP     PUSH
 
+; -----------------------------------------------------------------------------
+;
 ;       SP!
+;
+;       > Initialises the computation stack pointer (i.e. clears the stack).
+;
+; -----------------------------------------------------------------------------
 
 .L8445  DEFWORD "SP!"
         EQUW    L8431
@@ -1050,7 +1056,16 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         STA     1,X
         JMP     NEXT
 
-;       U/
+; -----------------------------------------------------------------------------
+;
+;       U/   ( ud\u1 ... u2\u3 )
+;
+;       > Leaves the unsigned remainder u2 and unsigned quotient u3 from the
+;       > division of the unsigned double number dividend ud by the unsigned
+;       > divisor u1. No protection is given against arithmetical overflow or
+;       > division by zero.
+;
+; -----------------------------------------------------------------------------
 
 .L8508  DEFWORD "U/"
         EQUW    L84D5
@@ -1219,7 +1234,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       EXIT   ( ... )
+;       EXIT
 ;
 ;       > When compiled within a colon-definition, terminates execution of the
 ;       > definition at that point. It may not be used within a DO ... LOOP .
@@ -3534,7 +3549,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       QUIT   ( ... )
+;       QUIT
 ;
 ;       > Clears the return stack, stops and returns control to the keyboard.
 ;       > No message is given.
@@ -3639,7 +3654,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       (ABORT)   ( ... )
+;       (ABORT)
 ;
 ;       > Clears the data and return stacks and sets execution mode. Control is
 ;       > returned to the keyboard interpreter. See ABORT .
@@ -3778,7 +3793,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       START   ( ... )
+;       START
 ;
 ;       > The high-level entry point to FORTH on a cold start. The computation
 ;       > and return stacks are cleared. Any applications dictionary is
@@ -4009,7 +4024,24 @@ ENDIF
         EQUW    DROP
         EQUW    EXIT
 
-;       U/MOD
+; -----------------------------------------------------------------------------
+;
+;       U/MOD   ( ud\u1 ... u2\u3 )
+;
+;       > The action is similar to that of U/ except that an error message is
+;       > given if division by zero is attempted. All other division words use
+;       > U/MOD as their basis and are therefore protected against division by
+;       > zero.
+;
+;       : U/MOD
+;        ?DUP IF
+;         U/
+;        ELSE
+;         11 ERROR
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .L95D7  DEFWORD "U/MOD"
         EQUW    L95C1

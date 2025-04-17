@@ -600,7 +600,22 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         BVS     L8246
         BVC     L8244
 
-;       (ULOOP)
+; -----------------------------------------------------------------------------
+;
+;       (ULOOP)   ( ... )
+;
+;       > The run-time procedure for an unsigned version of LOOP . It is used
+;       > by the system for loops involving unsigned indices, for example,
+;       > addresses. It is not available to the user in the system as provided
+;       > but can be made so by entering the following definition:
+;       >
+;       > : ULOOP   3 ?PAIRS COMPILE (ULOOP) BACK ; IMMEDIATE
+;       >
+;       > It may then be used in a colon-definition as:
+;       >
+;       > ... DO .... ULOOP ....
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETULOOP_NFA
         DEFWORD "(ULOOP)"
@@ -997,7 +1012,13 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         INX
         JMP     POPTWO
 
-;       U*
+; -----------------------------------------------------------------------------
+;
+;       U*   ( u1\u2 ... ud )
+;
+;       > Leaves the unsigned double-precision product of two unsigned numbers.
+;
+; -----------------------------------------------------------------------------
 
 .L84D5  DEFWORD "U*"
         EQUW    L849F
@@ -1714,11 +1735,10 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;       >
 ;       > R: NNNN .... R;
 ;       >
-;       > With this form of colon-definition references may be
-;       > made from within the definition to the name NNNN
-;       > itself. It should be used with care since any error
-;       > during compilation will leave the incomplete definition
-;       > in an executable form.
+;       > With this form of colon-definition references may be made from within
+;       > the definition to the name NNNN itself. It should be used with care
+;       > since any error during compilation will leave the incomplete
+;       > definition in an executable form.
 ;
 ;       : R:
 ;        ?EXEC
@@ -1814,13 +1834,11 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;       >
 ;       > n USER CCCC
 ;       >
-;       > It creates a user variable CCCC , execution of which
-;       > leaves the address, in the user area, of the value of
-;       > CCCC . The value of n is the offset from the start of
-;       > the user variable area to the memory location (2 bytes)
-;       > in which the value is stored. The value is not
-;       > initialised. Offsets from 0 to &30 incusive are used
-;       > by the system.
+;       > It creates a user variable CCCC , execution of which leaves the
+;       > address, in the user area, of the value of CCCC . The value of n is
+;       > the offset from the start of the user variable area to the memory
+;       > location (2 bytes) in which the value is stored. The value is not
+;       > initialised. Offsets from 0 to &30 incusive are used by the system.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -2461,13 +2479,11 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       ?PAIRS   ( n1\n2 ... )
 ;
-;       > Issues an error message if n1 does not
-;       > equal n2. The message indicates that compiled
-;       > conditionals (IF ... ELSE ... THEN or BEGIN ... UNTIL
-;       > etc.) do not match. It is part of the compiler security.
-;       > The error message is given if, for example,
-;       > the sequence IF ... UNTIL is found during compilation
-;       > of a dictionary entry.
+;       > Issues an error message if n1 does not equal n2. The message
+;       > indicates that compiled conditionals (IF ... ELSE ... THEN or BEGIN
+;       > ... UNTIL etc.) do not match. It is part of the compiler security.
+;       > The error message is given if, for example, the sequence IF ... UNTIL
+;       > is found during compilation of a dictionary entry.
 ;
 ;       : ?PAIRS
 ;        -
@@ -2924,10 +2940,10 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;       MOVE   ( from\to\count ... )
 ;
 ;       > Moves 'count' words (16-bit values) starting at 'from' to the block
-;       > of memory starting at 'to'. The 16-bit value at 'from' is moved
-;       > first and the transfer proceeds towards high memory. No check is
-;       > made as to whether the destination and source areas overlap. If
-;       > 'count' is zero or negative nothing is moved.
+;       > of memory starting at 'to'. The 16-bit value at 'from' is moved first
+;       > and the transfer proceeds towards high memory. No check is made as to
+;       > whether the destination and source areas overlap. If 'count' is zero
+;       > or negative nothing is moved.
 ;
 ;       : MOVE
 ;        DUP + CMOVE  ( duplicate 'count' and call CMOVE )
@@ -3322,11 +3338,10 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;       >
 ;       > : CCCC .... ;
 ;       >
-;       > Creates a dictionary entry for the word CCCC as being
-;       > equivalent to the sequence of FORTH words until the
-;       > next <;>. Each word in the sequence is compiled into
-;       > the dictionary entry, unless it is in the immediate
-;       > execution mode.
+;       > Creates a dictionary entry for the word CCCC as being equivalent to
+;       > the sequence of FORTH words until the next <;>. Each word in the
+;       > sequence is compiled into the dictionary entry, unless it is in the
+;       > immediate execution mode.
 ;
 ;       : :
 ;        R:   SMUDGE
@@ -3521,8 +3536,8 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       QUIT   ( ... )
 ;
-;       > Clears the return stack, stops and
-;       > returns control to the keyboard. No message is given.
+;       > Clears the return stack, stops and returns control to the keyboard.
+;       > No message is given.
 ;
 ;       : QUIT
 ;        0 BLK !
@@ -3563,13 +3578,13 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       DEFINITIONS
 ;
-;       > Sets the CURRENT vocabulary to the
-;       > CONTEXT vocabulary. If used in the form:
+;       > Sets the CURRENT vocabulary to the CONTEXT vocabulary. If used in the
+;       > form:
 ;       >
 ;       > CCCC DEFINITIONS
 ;       >
-;       > where CCCC is a VOCABULARY word, all subsequent
-;       > definitions will be placed in the vocabulary CCCC.
+;       > where CCCC is a VOCABULARY word, all subsequent definitions will be
+;       > placed in the vocabulary CCCC.
 ;
 ;       : DEFINITIONS
 ;        CONTEXT @   CURRENT !
@@ -3593,12 +3608,11 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       (WARM)
 ;
-;       > A routine which returns control to the
-;       > keyboard interpreter. It is used by COLD, WARM and the
-;       > error-handling procedures. The numeric base is set to
-;       > decimal and FORTH becomes both the current and context
-;       > vocabularies. The return stack (but not the computation
-;       > stack) is cleared.
+;       > A routine which returns control to the keyboard interpreter. It is
+;       > used by COLD, WARM and the error-handling procedures. The numeric
+;       > base is set to decimal and FORTH becomes both the current and context
+;       > vocabularies. The return stack (but not the computation stack) is
+;       > cleared.
 ;
 ;       : (WARM)
 ;        SP!
@@ -3627,9 +3641,8 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       (ABORT)   ( ... )
 ;
-;       > Clears the data and return stacks and
-;       > sets execution mode. Control is returned to the
-;       > keyboard interpreter. See ABORT .
+;       > Clears the data and return stacks and sets execution mode. Control is
+;       > returned to the keyboard interpreter. See ABORT .
 ;
 ;       : (ABORT)
 ;        SP!
@@ -3655,9 +3668,8 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       ESCAPE
 ;
-;       > Prints the message 'Escape' and re-enters
-;       > the system via QUIT. This is the routine executed when
-;       > the ESCAPE key is pressed.
+;       > Prints the message 'Escape' and re-enters the system via QUIT. This
+;       > is the routine executed when the ESCAPE key is pressed.
 ;
 ;       : ESCAPE
 ;        SP!
@@ -3768,17 +3780,14 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       START   ( ... )
 ;
-;       > The high-level entry point to FORTH on a
-;       > cold start. The computation and return stacks are
-;       > cleared. Any applications dictionary is discarded and
-;       > all vectored words are initialised to their default
-;       > values. The mass storage buffers are initialised to the
-;       > number of buffers given by MINBUF and marked as being
-;       > empty; OFFSET is set to zero. User-defined keys 8 and 9
-;       > are programmed for the correct WARM and COLD entry
-;       > points respectively and printer output is disabled.
-;       > Control is passed to the keyboard interpreter via
-;       > (ABORT) .
+;       > The high-level entry point to FORTH on a cold start. The computation
+;       > and return stacks are cleared. Any applications dictionary is
+;       > discarded and all vectored words are initialised to their default
+;       > values. The mass storage buffers are initialised to the number of
+;       > buffers given by MINBUF and marked as being empty; OFFSET is set to
+;       > zero. User-defined keys 8 and 9 are programmed for the correct WARM
+;       > and COLD entry points respectively and printer output is disabled.
+;       > Control is passed to the keyboard interpreter via (ABORT) .
 ;
 ;       : START
 ;        SP!
@@ -3869,16 +3878,13 @@ ENDIF
 ;
 ;       COLD
 ;
-;       > The cold start procedure used on first
-;       > entry to the system. The dictionary pointer and user
-;       > variables are initialised from the boot-up parameters
-;       > and the system re-started via (ABORT). The mass
-;       > storage buffers are cleared, function keys 8 and 9 are
-;       > initialised, and printer output is disabled. All
-;       > vectored words are set to their default actions. It
-;       > may be called from the keyboard to remove all
-;       > application programs and restart with the nucleus
-;       > dictionary alone.
+;       > The cold start procedure used on first entry to the system. The
+;       > dictionary pointer and user variables are initialised from the
+;       > boot-up parameters and the system re-started via (ABORT). The mass
+;       > storage buffers are cleared, function keys 8 and 9 are nitialised,
+;       > and printer output is disabled. All vectored words are set to their
+;       > default actions. It may be called from the keyboard to remove all
+;       > application programs and restart with the nucleus dictionary alone.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -3904,13 +3910,11 @@ ENDIF
 ;
 ;       WARM
 ;
-;       > Performs a warm start. The stacks are
-;       > cleared. The CURRENT and CONTEXT vocabularies are set
-;       > to FORTH, and DECIMAL numeric base is selected. No
-;       > other initialisation takes place. In particular the
-;       > user's dictionary and the contents of the buffer are
-;       > preserved. All vectored routines maintain their current
-;       > assignments.
+;       > Performs a warm start. The stacks are cleared. The CURRENT and
+;       > CONTEXT vocabularies are set to FORTH, and DECIMAL numeric base is
+;       > selected. No other initialisation takes place. In particular the
+;       > user's dictionary and the contents of the buffer are preserved. All
+;       > vectored routines maintain their current assignments.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -4435,10 +4439,9 @@ ENDIF
 ;
 ;       BACK   ( addr ... )
 ;
-;       > Calculates the backward branch offset
-;       > from HERE to addr and copiles into the next available
-;       > dictionary memory address. Used in the compilation
-;       > of conditionals ( AGAIN, UNTIL etc).
+;       > Calculates the backward branch offset from HERE to addr and compiles
+;       > into the next available dictionary memory address. Used in the
+;       > compilation of conditionals ( AGAIN, UNTIL etc).
 ;
 ;       : BACK
 ;        HERE - ,
@@ -4545,9 +4548,9 @@ ENDIF
 ;       > BEGIN ... UNTIL
 ;       > BEGIN ... WHILE ... REPEAT
 ;       >
-;       > BEGIN marks the start of a sequence that may be
-;       > executed repeatedly. It acts as a return point from
-;       > the corresponding AGAIN , UNTIL or REPEAT .
+;       > BEGIN marks the start of a sequence that may be executed repeatedly.
+;       > It acts as a return point from the corresponding AGAIN , UNTIL or
+;       > REPEAT .
 ;
 ;       : BEGIN
 ;        ?COMP
@@ -4585,9 +4588,9 @@ ENDIF
 ;       >
 ;       > BEGIN ... AGAIN
 ;       >
-;       > During the execution of a word containing this sequence,
-;       > AGAIN forces a branch back to the corresponding BEGIN
-;       > to create an endless loop.
+;       > During the execution of a word containing this sequence, AGAIN
+;       > forces a branch back to the corresponding BEGIN to create an endless
+;       > loop.
 ;
 ;       : AGAIN
 ;        1 ?PAIRS
@@ -4625,8 +4628,7 @@ ENDIF
 ;       >
 ;       > BEGIN ... WHILE ... REPEAT
 ;       >
-;       > In execution REPEAT forces an unconditional branch back
-;       > to BEGIN .
+;       > In execution REPEAT forces an unconditional branch back to BEGIN .
 ;
 ;       : REPEAT
 ;        >R >R   AGAIN   R> R>
@@ -6165,7 +6167,7 @@ EDITOR  =       XEDITOR-REL
 ;       ?R/W
 ;
 ;       Makes R/W point to an implementation for cassette (TR/W) or disc
-;       (DR/W),         depending on the active filing system.
+;       (DR/W), depending on the active filing system.
 ;
 ;       : ?R/W
 ;        ?FILE 3 < IF

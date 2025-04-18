@@ -982,13 +982,23 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         STY     2,X
         JMP     NEXT
 
-;       SP@
+; -----------------------------------------------------------------------------
+;
+;       SP@   ( ... addr )
+;
+;       > Leaves the value of the stack pointer on the stack. The value
+;       > corresponds to the state of the stack before the operation.
+;
+; -----------------------------------------------------------------------------
 
-.L8422  DEFWORD "SP@"
+.SPFETCH_NFA
+        DEFWORD "SP@"
         EQUW    ENCLOSE_NFA
 .SPFETCH
         EQUW    *+2
-        TXA
+        TXA                     ; Transfer the data stack pointer in register X
+                                ; to the accumulator, and fall through to
+                                ; PUSH0A to push it as a cell.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -1001,19 +1011,27 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDA     #0
         JMP     PUSH
 
-;       RP@
+; -----------------------------------------------------------------------------
+;
+;       RP@   ( ... addr )
+;
+;       > Leaves the address of the return stack pointer. Note that this points
+;       > one byte below the last return stack value.
+;
+; -----------------------------------------------------------------------------
 
-.L8431  DEFWORD "RP@"
-        EQUW    L8422
+.RPFETCH_NFA
+        DEFWORD "RP@"
+        EQUW    SPFETCH_NFA
 .RPFETCH
         EQUW    *+2
-        STX     XSAVE
-        TSX
-        TXA
-        LDX     XSAVE
+        STX     XSAVE           ; Transfer the value of the SP register to the
+        TSX                     ; accumulator, push it as the low byte onto the
+        TXA                     ; stack, followed by a high byte of one (since
+        LDX     XSAVE           ; the return stack resides in $01xx).
         PHA
         LDA     #1
-        JMP     PUSH
+        JMP     PUSH            ; Fall through to PUSH to push it as a cell.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -1024,7 +1042,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .L8445  DEFWORD "SP!"
-        EQUW    L8431
+        EQUW    RPFETCH_NFA
 .SPSTORE
         EQUW    *+2
         LDY     #6              ; Transfer the low byte of the S0 user variable
@@ -2315,9 +2333,17 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .DPL    EQUW    DOUSER
         EQUB    $28
 
-;       CSP
+; -----------------------------------------------------------------------------
+;
+;       CSP   ( ... addr )
+;
+;       > A user variable used for temporary storage of the stack pointer in
+;       > checking of compilation errors.
+;
+; -----------------------------------------------------------------------------
 
-.L8AC6  DEFWORD "CSP"
+.CSP_NFA
+        DEFWORD "CSP"
         EQUW    L8ABD
 .CSP    EQUW    DOUSER
         EQUB    $2C
@@ -2325,7 +2351,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       R#
 
 .L8ACF  DEFWORD "R#"
-        EQUW    L8AC6
+        EQUW    CSP_NFA
 .RSHARP EQUW    DOUSER
         EQUB    $2E
 
@@ -2555,16 +2581,26 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       NOT
 
-.L8C04  DEFWORD "NOT"
+.NOT_NFA
+        DEFWORD "NOT"
         EQUW    L8BF0
 .NOT    EQUW    DOCOLON
         EQUW    ZEROEQUAL
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       !CSP
+;
+;       > Stores the stack pointer value in user variable CSP. Used as part of
+;       > the compiler security.
+;
+;       : !CSP  SP@ CSP !  ;
+;
+; -----------------------------------------------------------------------------
 
 .L8C10  DEFWORD "!CSP"
-        EQUW    L8C04
+        EQUW    NOT_NFA
 .STORECSP
         EQUW    DOCOLON
         EQUW    SPFETCH
@@ -2593,7 +2629,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > Issues an error message if not compiling.
 ;
 ;       : ?COMP
-;        STATE @   0= 17 ?ERROR   EXIT
+;        STATE @   0= 17 ?ERROR
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -2639,7 +2675,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8C6A  DEFWORD "?PAIRS"
+.QUERYPAIRS_NFA
+        DEFWORD "?PAIRS"
         EQUW    L8C54
 .QUERYPAIRS
         EQUW    DOCOLON
@@ -2648,10 +2685,24 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    QUERYERROR
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ?CSP
+;
+;       > Issues an error message if stack position differs from that saved in
+;       > CSP . Used as part of the compiler security.
+;
+;       : ?CSP
+;        SP@
+;        CSP @ -
+;        20 ?ERROR
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8C7F  DEFWORD "?CSP"
-        EQUW    L8C6A
+.QUERYCSP_NFA
+        DEFWORD "?CSP"
+        EQUW    QUERYPAIRS_NFA
 .QUERYCSP
         EQUW    DOCOLON
         EQUW    SPFETCH
@@ -2665,7 +2716,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       ?LOADING
 
 .L8C98  DEFWORD "?LOADING"
-        EQUW    L8C7F
+        EQUW    QUERYCSP_NFA
 .QUERYLOADING
         EQUW    DOCOLON
         EQUW    BLK
@@ -2752,7 +2803,6 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       : ]
 ;        $C0 STATE !
-;        EXIT
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -2776,7 +2826,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > in a colon-definition for later over-writing by the execution address
 ;       > of a subsequent definition.
 ;
-;       : NOOP  EXIT  ;
+;       : NOOP ;
 ;
 ; -----------------------------------------------------------------------------
 
@@ -2878,7 +2928,6 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;        COMPILE (;CODE)
 ;        [ ASSEMBLER
 ;        !CSP
-;        EXIT
 ;       ; IMMEDATE
 ;
 ; -----------------------------------------------------------------------------
@@ -4749,7 +4798,6 @@ ENDIF
 ;        3 ?PAIRS
 ;        COMPILE (LOOP)
 ;        BACK
-;        EXIT
 ;       ; IMMEDIATE
 ;
 ; -----------------------------------------------------------------------------
@@ -6696,7 +6744,7 @@ REL_SZ = *-REL_SRC
         EQUW    MINUS
         EQUW    LIT,14
         EQUW    QUERYERROR
-        EQUW    EXIT
+        EQUW    EXIT    
 
 ;       N
 

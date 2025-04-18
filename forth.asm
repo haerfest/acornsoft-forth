@@ -514,8 +514,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .FETCHEXECUTE_NFA
         DEFWORD "@EXECUTE"
         EQUW    EXECUTE_NFA
-.FETCHEXECUTE {
-        EQUW    *+2
+.FETCHEXECUTE
+{       EQUW    *+2
         LDA     (0,X)           ; Transfer the CFA from the pointer at the top
         STA     W               ; of the stack, to W, thereby modifying the
         INC     0,X             ; indirect JMP (...) we'll use down below. We
@@ -1796,89 +1796,139 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8874  DEFWORD "?FILE"
+.QUERYFILE_NFA
+        DEFWORD "?FILE"
         EQUW    L885B
 .QUERYFILE
         EQUW    *+2
-        TYA                     ; A := Y := 0
-        JSR     OSARGS  
-        JMP     PUSH0A
+        TYA                     ; With A and Y cleared, OSARGS will rturn the
+        JSR     OSARGS          ; current filing system in the accumulator,
+        JMP     PUSH0A          ; which we push on the stack as a cell.
 
-;       C@
+; -----------------------------------------------------------------------------
+;
+;       C@   ( addr ... b )
+;
+;       > Leaves b as the 8-bit contents of the address addr.
+;
+; -----------------------------------------------------------------------------
 
-.L8885  DEFWORD "C@"
-        EQUW    L8874
+.CFETCH_NFA
+        DEFWORD "C@"
+        EQUW    QUERYFILE_NFA
 .CFETCH EQUW    *+2
-        LDA     (0,X)
-        STA     0,X
-        STY     1,X
-        JMP     NEXT
+        LDA     (0,X)           ; Fetch the low byte that the address on top of 
+        STA     0,X             ; the data stack points to.  Replace the
+        STY     1,X             ; address by the byte we just read, and set the
+        JMP     NEXT            ; high byte to zero via Y.
 
-;       @
+; -----------------------------------------------------------------------------
+;
+;       @   ( addr ... n )
+;
+;       > Leaves on the stack the 16-bit value n found at the address addr.
+;
+; -----------------------------------------------------------------------------
 
-.L8895  DEFWORD "@"
-        EQUW    L8885
-.FETCH  EQUW    *+2
-        LDA     (0,X)
-        PHA
-        INC     0,X
-        BNE     L88A4
+.FETCH_NFA
+        DEFWORD "@"
+        EQUW    CFETCH_NFA
+.FETCH
+{       EQUW    *+2
+        LDA     (0,X)           ; Fetch the low byte that the address on top of
+        PHA                     ; the stack points to, and push it on the
+        INC     0,X             ; return stack. Increment the address, and
+        BNE     skip            ; fetch the high byte into the accumulator.
         INC     1,X
-.L88A4  LDA     (0,X)
-        JMP     PUT
+.skip   LDA     (0,X)
+        JMP     PUT             ; Continue with PUT to replace the address by
+}                               ; the value just read.
 
-;       C!
+; -----------------------------------------------------------------------------
+;
+;       C!   ( b\addr ... )
+;
+;       > Stores byte b (8 bits) at the address addr.
+;
+; -----------------------------------------------------------------------------
 
-.L88A9  DEFWORD "C!"
-        EQUW    L8895
+.CSTORE_NFA
+        DEFWORD "C!"
+        EQUW    FETCH_NFA
 .CSTORE
         EQUW    *+2
-        LDA     2,X
+        LDA     2,X             ; Fetch the low byte of the cell on the stack
+        STA     (0,X)           ; one item down, and store it at the address
+        JMP     POPTWO          ; pointed to by the top of the stack. Then
+                                ; continue to NEXT after dropping two cells.
+
+; -----------------------------------------------------------------------------
+;
+;       !   ( n\addr ... )
+;
+;       > Stores the value n at the address addr.
+;
+; -----------------------------------------------------------------------------
+
+.STORE_NFA
+        DEFWORD "!"
+        EQUW    CSTORE_NFA
+.STORE
+{       EQUW    *+2
+        LDA     2,X             ; Fetch the low byte of the cell on the stack
+        STA     (0,X)           ; one item down, and store it at the address
+        INC     0,X             ; pointed to by the top of the stack. Then
+        BNE     skip            ; increment the address, and repeat for the
+        INC     1,X             ; high byte.
+.skip   LDA     3,X
         STA     (0,X)
-        JMP     POPTWO
+        JMP     POPTWO          ; Continue to NEXT after dropping two cells.
+}
 
-;       !
+; -----------------------------------------------------------------------------
+;
+;       +!   ( n\addr ... )
+;
+;       > Adds n to the value at the address addr.
+;
+; -----------------------------------------------------------------------------
 
-.L88B7  DEFWORD "!"
-        EQUW    L88A9
-.STORE  EQUW    *+2
-        LDA     2,X
-        STA     (0,X)
-        INC     0,X
-        BNE     L88C7
-        INC     1,X
-.L88C7  LDA     3,X
-        STA     (0,X)
-        JMP     POPTWO
-
-;       +!
-
-.L88CE  DEFWORD "+!"
-        EQUW    L88B7
+.PLUSSTORE_NFA
+        DEFWORD "+!"
+        EQUW    STORE_NFA
 .PLUSSTORE
-        EQUW    *+2
-        CLC
-        LDA     (0,X)
-        ADC     2,X
-        STA     (0,X)
+{       EQUW    *+2
+        CLC                     ; Load the low byte of the value pointed to by
+        LDA     (0,X)           ; the top of the stack, and add the low byte
+        ADC     2,X             ; of the value one cell down. Increment the
+        STA     (0,X)           ; address at the top of the stack.
         INC     0,X
-        BNE     L88E2
+        BNE     skip
         INC     1,X
-.L88E2  LDA     (0,X)
+.skip   LDA     (0,X)           ; And repeat for the high byte.
         ADC     3,X
         STA     (0,X)
-        JMP     POPTWO
+        JMP     POPTWO          ; Continue to NEXT after dropping two cells.
+}
 
-;       TOGGLE
+; -----------------------------------------------------------------------------
+;
+;       TOGGLE   ( addr\b ... )
+;
+;       > Complements the contents of the address addr by the bit pattern b.
+;
+; -----------------------------------------------------------------------------
 
-.L88EB  DEFWORD "TOGGLE"
-        EQUW    L88CE
+.TOGGLE_NFA
+        DEFWORD "TOGGLE"
+        EQUW    PLUSSTORE_NFA
 .TOGGLE
         EQUW    *+2
-        LDA     (2,X)
-        EOR     0,X
-        STA     (2,X)
-        JMP     POPTWO
+        LDA     (2,X)           ; Load the byte pointed to by the address one
+        EOR     0,X             ; cell down on the stack, and perform an
+        STA     (2,X)           ; exclusive-or by the byte on top of the stack.
+        JMP     POPTWO          ; Then write it back, and continue to NEXT
+                                ; after dropping two cells.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -1904,8 +1954,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L88FF  DEFWORD "R:"
-        EQUW    L88EB
+.RCOLON_NFA
+        DEFWORD "R:"
+        EQUW    TOGGLE_NFA
 .RCOLON EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    STORECSP
@@ -1917,24 +1968,36 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    RBRAC
         EQUW    BRACKETSEMICOLONCODE
 .DOCOLON
-        LDA     IP+1            ; SAVE IP OF THE WORD THAT IS
-        PHA                     ; CALLING US ONTO THE RETURN
-        LDA     IP              ; STACK
+        LDA     IP+1            ; Save the IP of the word that is calling us
+        PHA                     ; onto the return stack, so we don't lose our
+        LDA     IP              ; execution progress in that word.
         PHA
-        CLC                     ; SINCE W POINTS TO THE CURRENT
-        LDA     W               ; WORD'S CFA, WHERE WE ARE CALLED
-        ADC     #2              ; FROM, SETTING IP TO W+2 HERE MEANS
-        STA     IP              ; POINTING IT TO THE WORD'S PFA
-        TYA                     ; NOTE THAT Y IS ALWAYS ZERO
+        CLC                     ; Then set IP to our parameter field address,
+        LDA     W               ; such that NEXT will start executing our
+        ADC     #2              ; definitions. We can do this since W points
+        STA     IP              ; to our code field address, and we simply add
+        TYA                     ; two to it and store that as the new IP .
         ADC     W+1
         STA     IP+1
-        JMP     NEXT
+        JMP     NEXT            ; Execution resumes from our PFA .
 
+; -----------------------------------------------------------------------------
+;
 ;       R;
+;
+;       > The form of <;> used to terminate a recursive colon-definition.
+;
+;       : R;
+;        ?CSP
+;        COMPILE EXIT
+;        [
+;       ; IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .RSEMICOLON_NFA
         DEFIMM  "R;"
-        EQUW    L88FF
+        EQUW    RCOLON_NFA
 .RSEMICOLON
         EQUW    DOCOLON
         EQUW    QUERYCSP
@@ -3692,7 +3755,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       DLITERAL
 
-.L9226  DEFIMM  "DLITERAL"
+.DLITER_NFA
+        DEFIMM  "DLITERAL"
         EQUW    LITERAL_NFA
 .DLITER EQUW    DOCOLON
         EQUW    STATE
@@ -3705,8 +3769,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ?STACK
 
-.L9243  DEFWORD "?STACK"
-        EQUW    L9226
+.QSTAC_NFA
+        DEFWORD "?STACK"
+        EQUW    DLITER_NFA
 .QSTAC  EQUW    DOCOLON
         EQUW    SPFETCH
         EQUW    SZERO
@@ -3734,21 +3799,33 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > sequence is compiled into the dictionary entry, unless it is in the
 ;       > immediate execution mode.
 ;
-;       : :
-;        R:   SMUDGE
+;       : <:>
+;        R:
+;        SMUDGE
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
 
 .COLON_NFA
         DEFWORD ":"
-        EQUW    L9243
+        EQUW    QSTAC_NFA
 .COLON  EQUW    DOCOLON
         EQUW    RCOLON
         EQUW    SMUDG
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ;
+;
+;       > Terminates a colon-definition and stops further compilation.
+;
+;       : <;>
+;        R;
+;        SMUDGE
+;       ; IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .L9276  DEFIMM  ";"
         EQUW    COLON_NFA
@@ -3886,7 +3963,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       : VOCABULARY
 ;        CREATE
-;         [ HEX ] A081  ,
+;         $A081 ,               ( $81 $A0 is the name field of the word " " )
 ;         CURRENT @ CFA ,
 ;         HERE   VOC-LINK @ ,   VOC-LINK !
 ;        DOES>
@@ -5034,7 +5111,25 @@ ENDIF
         EQUW    ONE
         EQUW    EXIT
 
-;       UNTIL
+; -----------------------------------------------------------------------------
+;
+;       UNTIL   ( f ... )
+;
+;       > Used in a colon-definition in the form
+;       >
+;       > BEGIN ... UNTIL
+;       >
+;       > If f is false execution branches back to the corresponding BEGIN .
+;       >
+;       > If f is true execution continues with the next word after UNTIL .
+;
+;       : UNTIL
+;        1 ?PAIRS
+;        COMPILE 0BRANCH
+;        BACK
+;       ; IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .UNTIL_NFA
         DEFIMM  "UNTIL"
@@ -5061,10 +5156,9 @@ ENDIF
 ;
 ;       : AGAIN
 ;        1 ?PAIRS
-;        ?COMP
-;        BRANCH BACK
-;       ;
-;       IMMEDIATE
+;        COMPILE BRANCH
+;        BACK
+;       ; IMMEDIATE
 ;
 ; -----------------------------------------------------------------------------
 
@@ -5079,7 +5173,23 @@ ENDIF
         EQUW    BACK
         EQUW    EXIT
 
-;       WHILE
+; -----------------------------------------------------------------------------
+;
+;       WHILE   ( f ... )
+;
+;       > Used in a colon-definition in the form:
+;       >
+;       > BEGIN ... WHILE ... REPEAT
+;       >
+;       > WHILE tests the top value on the stack. If it is true execution
+;       > continues to REPEAT which forces a branch back to BEGIN . If f is
+;       > false execution skips to the first word after REPEAT . See BEGIN .
+;
+;       : WHILE
+;        IF 2+ THEN
+;       ; IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
 .WHILE_NFA
         DEFIMM  "WHILE"

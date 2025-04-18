@@ -859,24 +859,24 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         SBC     #'0'            ; it's less than the character '0', then it
         BMI     NoDigit         ; certainly is no digit, so bail out.
         CMP     #10             ; If the numeric value is less than 10, check
-        BMI     CompareBase     ; it against the numeric base. If it is one of
-        SEC                     ; the seven characters in between the digits
-        SBC     #7              ; and letters, it is no digit, so bail out.
-        CMP     #10             ; Otherwise, go on to compare it against the
-        BMI     NoDigit         ; numeric base.
+        BMI     CompareBase     ; it against the numeric base. Else, if it is
+        SEC                     ; one of the seven characters in between the
+        SBC     #7              ; digits and letters, it is no digit so bail
+        CMP     #10             ; out. Otherwise, go on to compare it against
+        BMI     NoDigit         ; the numeric base.
 .CompareBase
-        CMP     0,X             ; Check whether the value is less than the low
-        BPL     NoDigit         ; byte of the numeric base. If not, it's no
-        STA     2,X             ; digit. Otherwise replace the character with
-        LDA     #1              ; the numeric value and push a 1 flag via PUT ,
-        PHA                     ; low byte on the return stack and high byte
-        TYA                     ; via the accumulator.
+        CMP     0,X             ; Check whether the value is equal to or larger
+        BPL     NoDigit         ; than the numeric base. If so, it's no digit.
+        STA     2,X             ; Otherwise replace the character on the stack
+        LDA     #1              ; with its numeric value (high byte should
+        PHA			; already be zero) and push a 1 flag via PUT .
+        TYA
         JMP     PUT
 .NoDigit
         TYA                     ; It's not a valid digit for the numeric base,
-        PHA                     ; so push a 0 flag via PUT , low byte on the
-        INX                     ; return stack and high byte via the
-        INX                     ; accumulator.
+        PHA                     ; so push a 0 flag via PUT .
+        INX
+        INX
         JMP     PUT
 }
 

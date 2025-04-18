@@ -76,7 +76,7 @@ PrintStrPtr             = $12
 
 BOS     = $10             ; Bottom of the data stack.
 TOS     = $58             ; Top of the data stack.
-N       = $60             ; Scratch workspace for various use.
+N       = $60             ; Scratch-pad area for various use.
 XSAVE   = $68             ; Location to temporarily save the X register.
 W       = XSAVE+2         ; Code field pointer.
 IP      = W+2             ; Interpretive Pointer ("PC"), points to current cell.
@@ -382,28 +382,45 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         DEFWORD "LIT"
         EQUW    0               ; We are the first word in the dictionary.
 .LIT
-        EQUW    *+2
+{       EQUW    *+2
         LDA     (IP),Y          ; Load the low byte of the literal value from
         PHA                     ; the parameter field, and push it onto the
         INC     IP              ; return stack. Then increment IP .
-        BNE     L815B
+        BNE     skip
         INC     IP+1
-.L815B  LDA     (IP),Y          ; Load the high byte of the literal value from
+.skip   LDA     (IP),Y          ; Load the high byte of the literal value from
         INC     IP              ; the parameter field into the accumulator, and
         BNE     PUSH            ; increment IP . Then fall through to PUSH it
         INC     IP+1            ; as a new cell onto the data stack.
+}
 
+; -----------------------------------------------------------------------------
+;
+;       > Push the accumulator (as high byte) and one byte from the return
+;       > stack as a new number on the computation stack, and execute NEXT .
+;
 ; -----------------------------------------------------------------------------
 
 .PUSH   DEX                     ; Make room for a new cell on the data stack.
-        DEX
+        DEX                     ; Fall through to PUT .
+
+; -----------------------------------------------------------------------------
+;
+;       > Replace the current top stack item from the accumulator and return
+;       > stack (as for PUSH)and execute NEXT .
+;
+; -----------------------------------------------------------------------------
 
 .PUT    STA     1,X             ; Write the new cell to the data stack,
         PLA                     ; consisting of the accumulator (high byte)
         STA     0,X             ; and the value on top of the return stack
-                                ; (low byte). Fall through to exeucting the
-                                ; next word.
+                                ; (low byte). Fall through to NEXT to execute
+                                ; the next word.
 
+; -----------------------------------------------------------------------------
+;
+;       > Transfer execution to the next word in the sequence.
+;
 ; -----------------------------------------------------------------------------
 
 .NEXT   LDY     #1              ; With IP pointing to the CFA of the next word
@@ -433,17 +450,33 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
                                 ; of the jump instruction?
 
 ; -----------------------------------------------------------------------------
+;
+;       > [SETUP] acts to transfer up to four items from the stack to a
+;       > scratch-pad area in page zero. On entry the accumulator should
+;       > contain the number of items to be transferred. On return from the
+;       > subroutine the Y-register will contain zero and the value in the
+;       > accumulator will be doubled; in other words it contains the number of
+;       > bytes transferred from the stack. The byte immediately preceding the
+;       > scratchpad area will also contain the number of bytes transferred.
+;
+;       Note that there is an invariant that the Y register is always zero,
+;       which is why SETUP does not explicitly reset it at the beginning.
+;
+; -----------------------------------------------------------------------------
 
-.SETUP  ASL     A
-        STA     $5F
-.L818D  LDA     0,X
-        STA     N,Y
-        INX
-        INY
-        CPY     $5F
-        BNE     L818D
-        LDY     #0
+.SETUP
+{
+        ASL     A               ; Each cell to copy consists of two bytes, and
+        STA     N-1             ; the number of bytes is stored in N-1.
+.loop   LDA     0,X             ; Load a byte from the data stack and store it
+        STA     N,Y             ; in the scratch-pad area. Keep doing this
+        INX                     ; until all bytes have been copied. The stack
+        INY                     ; pointer X is adjusted to remove them from the
+        CPY     N-1             ; stack.
+        BNE     loop
+        LDY     #0              ; Restore the invariant that Y is always zero.
         RTS
+}
 
 ; -----------------------------------------------------------------------------
 ;
@@ -459,14 +492,15 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    LIT_NFA
 .EXECUTE
         EQUW    *+2
-        LDA     0,X             ; W := POP()
-        STA     W
-        LDA     1,X
+        LDA     0,X             ; Transfer the CFA from the stack to W, thereby
+        STA     W               ; modifying the indirect JMP (...) we'll use
+        LDA     1,X             ; down below.
         STA     W+1
-        INX
+        INX                     ; Adjust the stack pointer.
         INX
 
-        JMP     W-1             ; JMP (W)
+        JMP     W-1             ; Perform a (modified) indirect jump JMP (...)
+                                ; to what the CFA points to.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -480,19 +514,20 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .FETCHEXECUTE_NFA
         DEFWORD "@EXECUTE"
         EQUW    EXECUTE_NFA
-.FETCHEXECUTE
+.FETCHEXECUTE {
         EQUW    *+2
-        LDA     (0,X)           ; LO(W) := (X)
-        STA     W
-        INC     0,X             ; (X) := (X) + 1
-        BNE     L81CB
-        INC     1,X
-.L81CB  LDA     (0,X)           ; HI(W) := (X)
+        LDA     (0,X)           ; Transfer the CFA from the pointer at the top
+        STA     W               ; of the stack, to W, thereby modifying the
+        INC     0,X             ; indirect JMP (...) we'll use down below. We
+        BNE     skip            ; have to increment the pointer on top of the
+        INC     1,X             ; stack to point to the second byte of the CFA.
+.skip   LDA     (0,X)
         STA     W+1
-        INX                     ; X := X + 2
+        INX                     ; Adjust the stack pointer.
         INX
 
-        JMP     W-1
+        JMP     W-1             ; Perform a (modified) indirect jump JMP (...)
+}                               ; to what the CFA points to.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -511,19 +546,22 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .BRANCH
         EQUW    DOBRANCH
 .DOBRANCHX
-        LDX     XSAVE
+        LDX     XSAVE           ; Restore the data stack pointer.
 .DOBRANCH
         CLC
-        LDA     (IP),Y          ; A := IP + (IP)
-        ADC     IP
-        PHA
-        INY                     ; Y := 1
-        LDA     (IP),Y
-        ADC     IP+1
-        STA     IP+1            ; IP := A
+        LDA     (IP),Y          ; Read the low byte of the branch offset from
+        ADC     IP              ; the parameter field, add the low byte of IP
+        PHA                     ; to it. Save it on the return stack while we
+        INY                     ; still need the original value of IP. Then
+        LDA     (IP),Y          ; fetch the high byte of the offset and update
+        ADC     IP+1            ; all of IP.
+        STA     IP+1
         PLA
         STA     IP
-        JMP     NEXTY1
+        JMP     NEXTY1          ; Since Y is now one instead of zero, violating
+                                ; the invariant, we call into NEXT right after
+                                ; where it would have set Y to one as well. It
+                                ; will take care of resetting Y for us.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -541,18 +579,20 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    BRANCH_NFA
 .ZEROBRANCH
         EQUW    *+2
-        INX
-        INX
-        LDA     $FE,X
-        ORA     $FF,X
-        BEQ     DOBRANCH
-.BUMP   CLC
-        LDA     IP
-        ADC     #2
+        INX                     ; Update the stack pointer in advance to
+        INX                     ; prevent it messing up our CPU flags. That
+        LDA     $FE,X           ; means we need to load the flag f from the
+        ORA     $FF,X           ; stack at -2,X and -1,X rather than the
+        BEQ     DOBRANCH        ; usual 0,X and 1,X. Branch if flag f is zero.
+.BUMPIP
+{       CLC                     ; Advance IP by one cell to skip past the
+        LDA     IP              ; branch offset that is stored in the parameter
+        ADC     #2              ; field.
         STA     IP
-        BCC     L8213
+        BCC     skip
         INC     IP+1
-.L8213  JMP     NEXT
+.skip   JMP     NEXT
+}
 
 ; -----------------------------------------------------------------------------
 ;
@@ -560,6 +600,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       > The run-time procedure compiled by LOOP . It increments the loop
 ;       > index by one and tests for loop completion. See LOOP .
+;
+;       Note that the return stack contains the loop maximum and the loop
+;       index.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -569,29 +612,33 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .BRACKETLOOP
         EQUW    *+2
         STX     XSAVE
-        TSX
-        INC     $101,X
-        BNE     L8233
-        TYA
+        TSX                     ; Increment the low byte of the loop index on
+        INC     $101,X          ; the return stack. If it is now zero, also
+        BNE     CHECKLOOPDONE   ; increment the high byte by adding zero (the
+        TYA                     ; Y register) with the carry set.
         SEC
         ADC     $102,X
-        BVS     L8246
+        BVS     LOOPDONE        ; We're done upon a twos complement overflow.
         STA     $102,X
-.L8233  CLC
-        LDA     $103,X
-        SBC     $101,X
-        LDA     $104,X
-        SBC     $102,X
-        BVC     L8244
-        EOR     #$80
-.L8244  BPL     DOBRANCHX
-
-.L8246  LDX     XSAVE
+.CHECKLOOPDONE
+        CLC
+        LDA     $103,X          ; Access the loop maximum from the return stack
+        SBC     $101,X          ; and subtract the current loop index, to see
+        LDA     $104,X          ; whether we are done. The accumulator ends up
+        SBC     $102,X          ; with the high byte of the subtraction.
+        BVC     LOOPAGAIN       ; Check whether to loop again if there is no
+        EOR     #$80            ; sign error, otherwise correct the sign first.
+.LOOPAGAIN
+        BPL     DOBRANCHX       ; Loop again when the maximim has not been
+                                ; reached yet.
+.LOOPDONE
+        LDX     XSAVE           ; Restore the return stack pointer and remove
+        PLA                     ; the loop index and loop maximum from the
+        PLA                     ; return stack.
         PLA
         PLA
-        PLA
-        PLA
-        JMP     BUMP
+        JMP     BUMPIP          ; Then bump IP beyond the branch offset in the
+                                ; parameter field and continue beyond the loop.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -625,15 +672,15 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         ADC     $102,X
         STA     $102,X
         PLA
-        BVS     L8246
-        BPL     L8233
+        BVS     LOOPDONE
+        BPL     CHECKLOOPDONE
         SEC
         LDA     $101,X
         SBC     $103,X
         LDA     $102,X
         SBC     $104,X
-        BVS     L8246
-        BVC     L8244
+        BVS     LOOPDONE
+        BVC     LOOPAGAIN
 
 ; -----------------------------------------------------------------------------
 ;
@@ -667,7 +714,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         SBC     $101,X
         LDA     $104,X
         SBC     $102,X
-        JMP     L8244
+        JMP     LOOPAGAIN
 
 ; -----------------------------------------------------------------------------
 ;
@@ -709,11 +756,23 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDA     0,X
         PHA
 
-.POPTWO INX                     ; X := X + 2
-        INX
+; -----------------------------------------------------------------------------
+;
+;       > Drop the top two stack items and execute NEXT .
+;
+; -----------------------------------------------------------------------------
 
-.POP    INX                     ; X := X + 2
-        INX
+.POPTWO INX                     ; Decrement the data stack pointer by one
+        INX                     ; cell.
+
+; -----------------------------------------------------------------------------
+;
+;       > Drop the top stack item and execute NEXT .
+;
+; -----------------------------------------------------------------------------
+
+.POP    INX                     ; Decrement the data stack pointer by one
+        INX                     ; cell.
         JMP     NEXT
 
 ; -----------------------------------------------------------------------------
@@ -926,6 +985,14 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .SPFETCH
         EQUW    *+2
         TXA
+
+; -----------------------------------------------------------------------------
+;
+;       > Push zero (as high byte) and the accumulator (low byte) to the stack
+;       > and execute NEXT .
+;
+; -----------------------------------------------------------------------------
+ 
 .PUSH0A PHA
         LDA     #0
         JMP     PUSH
@@ -1286,10 +1353,10 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .L85E7  DEFWORD "EXIT"
         EQUW    KEY_NFA-REL
 .EXIT   EQUW    *+2
-        PLA                     ; IP := POP(R)
-        STA     IP
-        PLA
-        STA     IP+1
+        PLA                     ; Pop the previous value of IP, pointing in the
+        STA     IP              ; parameter field of the word that called us,
+        PLA                     ; into IP from the return stack, and continue
+        STA     IP+1            ; there when NEXT is called.
         JMP     NEXT
 
 ; -----------------------------------------------------------------------------
@@ -2503,7 +2570,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ?ERROR
 
-.L8C21  DEFWORD "?ERROR"
+.QUERYERROR_NFA
+        DEFWORD "?ERROR"
         EQUW    L8C10
 .QUERYERROR
         EQUW    DOCOLON
@@ -2514,10 +2582,21 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    DROP
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ?COMP
+;
+;       > Issues an error message if not compiling.
+;
+;       : ?COMP
+;        STATE @   0= 17 ?ERROR   EXIT
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8C3C  DEFWORD "?COMP"
-        EQUW    L8C21
+.QUERYCOMP_NFA
+        DEFWORD "?COMP"
+        EQUW    QUERYERROR_NFA
 .QUERYCOMP
         EQUW    DOCOLON
         EQUW    STATE
@@ -2530,7 +2609,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       ?EXEC
 
 .L8C54  DEFWORD "?EXEC"
-        EQUW    L8C3C
+        EQUW    QUERYCOMP_NFA
 .QUERYEXEC
         EQUW    DOCOLON
         EQUW    STATE
@@ -2594,7 +2673,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       IMMEDIATE
 
-.L8CB3  DEFWORD "IMMEDIATE"
+.IMMEDIATE_NFA
+        DEFWORD "IMMEDIATE"
         EQUW    L8C98
 .IMMEDIATE
         EQUW    DOCOLON
@@ -2603,10 +2683,24 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    TOGGLE
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       COMPILE
+;
+;       > COMPILE acts during the execution of the word containing it. The code
+;       > field (execution) address of the word following COMPILE is compiled
+;       > into the dictionary instead of executing, cf. [COMPILE] .
+;
+;       : COMPILE
+;        ?COMP
+;        R>    DUP 2+ >R
+;        @ ,
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .L8CCB  DEFWORD "COMPILE"
-        EQUW    L8CB3
+        EQUW    IMMEDIATE_NFA
 .COMPILE
         EQUW    DOCOLON
         EQUW    QUERYCOMP
@@ -4582,7 +4676,28 @@ ENDIF
         EQUW    LIT,3
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       LOOP
+;
+;       > Used in a colon-definition in the form:
+;       >
+;       > DO ... LOOP
+;       >
+;       > During execution LOOP controls branching back to the corresponding
+;       > DO , dependent on the loop index and loop limit. The loop index is
+;       > incremented by one and tested against the loop limit. Branching to DO
+;       > continues until the index is equal to or greater than the limit when
+;       > execution continues with the word following LOOP .
+;
+;       : LOOP
+;        3 ?PAIRS
+;        COMPILE (LOOP)
+;        BACK
+;        EXIT
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .LOOP_NFA
         DEFIMM  "LOOP"

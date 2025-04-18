@@ -316,20 +316,20 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .BootUpParameters
-        EQUW    TOPNFA          ; (UP),0   = $0C +ORIGIN: last word in FORTH
-                                ;                         dictionary.
-        EQUW    $7F             ; (UP),2   = $0E +ORIGIN: backspace character.
+        EQUW    TOPNFA          ; $0C +ORIGIN: last word in FORTH
+                                ;              dictionary.
+        EQUW    $7F             ; $0E +ORIGIN: backspace character.
 .InitialUP
-        EQUW    UAREA           ; (UP),4   = $10 +ORIGIN: initial UP .
-        EQUW    TOS             ; (UP),6   = $12 +ORIGIN: initial S0 .
-        EQUW    $01FF           ; (UP),8   = $14 +ORIGIN: initial R0 .
-        EQUW    TIBB            ; (UP),$10 = $16 +ORIGIN: initial TIB .
-        EQUW    31              ; (UP),$12 = $18 +ORIGIN: initial WIDTH .
-        EQUW    0               ; (UP),$14 = $1A +ORIGIN: initial WARNING .
-        EQUW    TOPDP           ; (UP),$16 = $1C +ORIGIN: initial FENCE .
-        EQUW    TOPDP           ; (UP),$18 = $1E +ORIGIN: initial DP .
-        EQUW    VL0-REL         ; (UP),$1A = $20 +ORIGIN: initial VOC-LINK .
-        EQUW    1               ; (UP),$1C = $22 +ORIGIN: initial LK .
+        EQUW    UAREA           ; $10 +ORIGIN: initial UP .
+        EQUW    TOS             ; $12 +ORIGIN: initial S0 .
+        EQUW    $01FF           ; $14 +ORIGIN: initial R0 .
+        EQUW    TIBB            ; $16 +ORIGIN: initial TIB .
+        EQUW    31              ; $18 +ORIGIN: initial WIDTH .
+        EQUW    0               ; $1A +ORIGIN: initial WARNING .
+        EQUW    TOPDP           ; $1C +ORIGIN: initial FENCE .
+        EQUW    TOPDP           ; $1E +ORIGIN: initial DP .
+        EQUW    VL0-REL         ; $20 +ORIGIN: initial VOC-LINK .
+        EQUW    1               ; $22 +ORIGIN: initial BLK .
 
         EQUB    "RdeG-H"        ; Author Richard de Grandis-Harrison
 
@@ -1047,7 +1047,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    *+2
         LDY     #6              ; Transfer the low byte of the S0 user variable
         LDA     (UP),Y          ; to register X, which acts as the computation
-        TAX                     ; stack pointer in zero page $0000 - $00FF.
+        TAX                     ; stack pointer in zero page $00xx.
         JMP     NEXT
 
 ; -----------------------------------------------------------------------------
@@ -1058,25 +1058,33 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8455  DEFWORD "RP!"
+.RPSTORE_NFA
+        DEFWORD "RP!"
         EQUW    L8445
 .RPSTORE
         EQUW    *+2
         STX     XSAVE
         LDY     #8              ; Transfer the low byte of the R0 user variable  
         LDA     (UP),Y          ; to the hardware stack register SP, which
-        TAX                     ; always resides at $0100 - $01FF.
+        TAX                     ; always resides in page one at $01xx.
         TXS
 .L8465  LDX     XSAVE
         JMP     NEXT
 
-;       (EMIT)
+; -----------------------------------------------------------------------------
+;
+;       (EMIT)   ( c ... )
+;
+;       > See EMIT .
+;
+; -----------------------------------------------------------------------------
 
-.L846A  DEFWORD "(EMIT)"
-        EQUW    L8455
+.BRACKETEMIT_NFA
+        DEFWORD "(EMIT)"
+        EQUW    RPSTORE_NFA
 .BRACKETEMIT
         EQUW    *+2
-        TYA
+        TYA                     ; Increment the value of user variable OUT .
         SEC
         LDY     #$1A
         ADC     (UP),Y
@@ -1085,10 +1093,10 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDA     #0
         ADC     (UP),Y
         STA     (UP),Y
-        LDA     0,X
-        AND     #$7F
+        LDA     0,X             ; Retrieve the character to emit from the stack
+        AND     #$7F            ; and mask the lower seven, then print it.
         JSR     OSWRCH
-        JMP     POP
+        JMP     POP             ; POP the value off the stack and continue.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -1890,8 +1898,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;        !CSP
 ;        CURRENT @   CONTEXT !
 ;        CREATE
-;        ]   (;CODE)
-;        ...
+;        ]
+;        (;CODE) ... machine code here ...
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -1924,7 +1932,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       R;
 
-.L892D  DEFIMM  "R;"
+.RSEMICOLON_NFA
+        DEFIMM  "R;"
         EQUW    L88FF
 .RSEMICOLON
         EQUW    DOCOLON
@@ -1934,28 +1943,57 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    LBRAC
         EQUW    EXIT
 
-;       CONSTANT
+; -----------------------------------------------------------------------------
+;
+;       CONSTANT   ( n ... )
+;
+;       > A defining word used in the form:
+;       >
+;       > n CONSTANT CCCC
+;       >
+;       > It creates a constant CCCC with the value n contained in its
+;       > parameter field. When CCCC is executed the value n will be left on
+;       > the stack.
+;
+;       : CONSTANT
+;        CREATE
+;        ,
+;        (;CODE) ... machine code here ...
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L893E  DEFWORD "CONSTANT"
-        EQUW    L892D
+.CONSTANT_NFA
+        DEFWORD "CONSTANT"
+        EQUW    RSEMICOLON_NFA
 .CONSTANT
         EQUW    DOCOLON
         EQUW    CREATE
         EQUW    COMMA
         EQUW    BRACKETSEMICOLONCODE
 .DOCONSTANT
-        LDY     #2
-        LDA     (W),Y
-        PHA
-        INY
+        LDY     #2              ; Since at run-time (W) points to the CFA of
+        LDA     (W),Y           ; the word, we add two to get to the parameter
+        PHA                     ; field. We retrieve the constant value stored
+        INY                     ; there and then PUSH it onto the data stack.
         LDA     (W),Y
         JMP     PUSH
 
+; -----------------------------------------------------------------------------
+;
 ;       VARIABLE
+;
+;       : VARIABLE
+;        CREATE
+;        0 ,
+;        (;CODE) ... machine code here...
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .VARIABLE_NFA
         DEFWORD "VARIABLE"
-        EQUW    L893E
+        EQUW    CONSTANT_NFA
 .VARIABLE
         EQUW    DOCOLON
         EQUW    CREATE
@@ -1964,10 +2002,10 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    BRACKETSEMICOLONCODE
 .DOVARIABLE
         CLC
-        LDA     W
-        ADC     #2
-        PHA
-        TYA
+        LDA     W               ; Since at run-time (W) points to the CFA of
+        ADC     #2              ; the word, we add two to get to the parameter
+        PHA                     ; field. We then PUSH its address onto the data
+        TYA                     ; stack.
         ADC     W+1
         JMP     PUSH
 
@@ -1985,6 +2023,11 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > location (2 bytes) in which the value is stored. The value is not
 ;       > initialised. Offsets from 0 to &30 incusive are used by the system.
 ;
+;       : USER
+;        CONSTANT
+;        (;CODE) ... machine code here ...
+;       ;
+;       
 ; -----------------------------------------------------------------------------
 
 .USER_NFA
@@ -1993,13 +2036,13 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .USER   EQUW    DOCOLON
         EQUW    CONSTANT
         EQUW    BRACKETSEMICOLONCODE
-.DOUSER LDY     #2
-        CLC
-        LDA     (W),Y
-        ADC     UP
-        PHA
-        LDA     #0
-        ADC     UP+1
+.DOUSER LDY     #2              ; Since at run-time (W) points to the CFA of
+        CLC                     ; the word, we add two to get to the parameter
+        LDA     (W),Y           ; field. We retrieve the constant value stored
+        ADC     UP              ; there, which is the offset in bytes from the
+        PHA                     ; start of the user area. We add it to the
+        LDA     #0              ; beginning of the user area as contained in
+        ADC     UP+1            ; UP, and then PUSH onto the data stack.
         JMP     PUSH
 
 ; -----------------------------------------------------------------------------
@@ -2011,7 +2054,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8999  DEFWORD "-2"
+.MINUSTWO_NFA
+        DEFWORD "-2"
         EQUW    USER_NFA
 .MINUSTWO
         EQUW    DOCONSTANT
@@ -2025,8 +2069,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L89A2  DEFWORD "-1"
-        EQUW    L8999
+.MINUSONE_NFA
+        DEFWORD "-1"
+        EQUW    MINUSTWO_NFA
 .MINUSONE
         EQUW    DOCONSTANT
         EQUW    -1
@@ -2039,8 +2084,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L89AB  DEFWORD "0"
-        EQUW    L89A2
+.ZERO_NFA
+        DEFWORD "0"
+        EQUW    MINUSONE_NFA
 .ZERO   EQUW    DOCONSTANT
         EQUW    0
 
@@ -2052,8 +2098,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L89B3  DEFWORD "1"
-        EQUW    L89AB
+.ONE_NFA
+        DEFWORD "1"
+        EQUW    ZERO_NFA
 .ONE    EQUW    DOCONSTANT
         EQUW    1
 
@@ -2065,22 +2112,32 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L89BB  DEFWORD "2"
-        EQUW    L89B3
+.TWO_NFA
+        DEFWORD "2"
+        EQUW    ONE_NFA
 .TWO    EQUW    DOCONSTANT
         EQUW    2
 
 ;       BL
 
-.L89C3  DEFWORD "BL"
-        EQUW    L89BB
+.BL_NFA DEFWORD "BL"
+        EQUW    TWO_NFA
 .BL     EQUW    DOCONSTANT
         EQUW    $20
 
+; -----------------------------------------------------------------------------
+;
 ;       C/L
+;
+;       > A constant containing the number of characters per line. This is
+;       > normally 64, so a full FORTH 'line' will, in Mode 7, occupy about
+;       > 1 1/2 lines of the VDU display.
+;
+; -----------------------------------------------------------------------------
 
-.L89CC  DEFWORD "C/L"
-        EQUW    L89C3
+.CSLASHL_NFA
+        DEFWORD "C/L"
+        EQUW    BL_NFA
 .CSLASHL
         EQUW    DOCONSTANT
         EQUW    64
@@ -2097,13 +2154,14 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .PAD_NFA
         DEFWORD "PAD"
-        EQUW    L89CC
+        EQUW    CSLASHL_NFA
 .PAD    EQUW    DOCONSTANT
         EQUW    PADD
 
 ;       B/BUF
 
-.L89E0  DEFWORD "B/BUF"
+.BSLASHBUF_NFA
+        DEFWORD "B/BUF"
         EQUW    LA01C-REL
 .BSLASHBUF
         EQUW    DOCONSTANT
@@ -2113,7 +2171,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .BSLASHSCR_NFA
         DEFWORD "B/SCR"
-        EQUW    L89E0
+        EQUW    BSLASHBUF_NFA
 .BSLASHSCR
         EQUW    DOCONSTANT
         EQUW    1
@@ -2267,7 +2325,16 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    DOUSER
         EQUB    $18
 
-;       OUT
+; -----------------------------------------------------------------------------
+;
+;       OUT   ( ... addr )
+;
+;       > A user variable containing a value that is incremented by EMIT . It
+;       > may be examined and changed by the user to control display formats.
+;
+;       HEX 1A USER OUT
+;
+; -----------------------------------------------------------------------------
 
 .L8A70  DEFWORD "OUT"
         EQUW    L8A67
@@ -2836,12 +2903,26 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .NOOP   EQUW    DOCOLON
         EQUW    EXIT
 
-;       ?TAB
+; -----------------------------------------------------------------------------
+;
+;       ?TAB   ( ... f )
+;
+;       > Tests if the TAB key is pressed at the instant ?TAB is called. A true
+;       > flag indicates that the key was pressed, otherwise a false flag is
+;       > left.
+;
+;       : ?TAB
+;        -97 ?KEY
+;        1 AND
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8D10  DEFWORD "?TAB"
+.QTAB_NFA
+        DEFWORD "?TAB"
         EQUW    NOOP_NFA
 .QTAB   EQUW    DOCOLON
-        EQUW    LIT,$FF9F
+        EQUW    LIT,-97
         EQUW    QUERYKEY
         EQUW    ONE
         EQUW    AND
@@ -2850,7 +2931,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       HEX
 
 .L8D25  DEFWORD "HEX"
-        EQUW    L8D10
+        EQUW    QTAB_NFA
 .HEX    EQUW    DOCOLON
         EQUW    LIT,16
         EQUW    BASE
@@ -3000,9 +3081,23 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    ZEROLESS
         EQUW    EXIT
 
-;       COUNT
+; -----------------------------------------------------------------------------
+;
+;       COUNT   ( addr1 ... addr2\n )
+;
+;       > Leaves the address addr2 and byte count n of a text string starting
+;       > at addr1, in a form suitable for use by TYPE . It is assumed that the
+;       > text string has its count byte at addr1 and that the actual character
+;       > string starts at addr1 + 1.
+;
+;       : COUNT
+;        DUP 1+ SWAP C@
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8DDB  DEFWORD "COUNT"
+.COUNT_NFA
+        DEFWORD "COUNT"
         EQUW    L8DCE
 .COUNT  EQUW    DOCOLON
         EQUW    DUP
@@ -3011,10 +3106,28 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    CFETCH
         EQUW    EXIT
 
-;       TYPE
+; -----------------------------------------------------------------------------
+;
+;       TYPE   ( addr\count ... )
+;
+;       > Transmits 'count' characters of a string starting at the address addr
+;       > to the output device.
+;
+;       : TYPE
+;        DUP 0> IF
+;         OVER + SWAP DO
+;          I C@ EMIT
+;         LOOP
+;        ELSE
+;         2DROP
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8DEF  DEFWORD "TYPE"
-        EQUW    L8DDB
+.TYPE_NFA
+        DEFWORD "TYPE"
+        EQUW    COUNT_NFA
 .TYPE   EQUW    DOCOLON
         EQUW    DUP
         EQUW    ZEROGREATER
@@ -3034,7 +3147,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       -TRAILING
 
 .L8E1A  DEFWORD "-TRAILING"
-        EQUW    L8DEF
+        EQUW    TYPE_NFA
 .DTRAI  EQUW    DOCOLON
         EQUW    DUP
         EQUW    ZEROLESS
@@ -3430,14 +3543,30 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    QUIT
         EQUW    EXIT
 
-;       ID.
+; -----------------------------------------------------------------------------
+;
+;       ID.   ( addr ... )
+;
+;       > Prints the name of a word from its name field address on the stack.
+;
+;       : ID.
+;        PAD BL 95 FILL         ( clear PAD with spaces )
+;        DUP PFA LFA            ( get to the LFA )
+;        OVER -                 ( calculate the length of the name)
+;        PAD SWAP CMOVE         ( copy the length-prepended name to PAD )
+;        PAD COUNT              ( convert to a string and its length )
+;        31 AND                 ( limit the length to 31 characters )
+;        TYPE SPACE             ( print the name, followed by a space )
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .L911D  DEFWORD "ID."
         EQUW    L90E4
 .IDDOT  EQUW    DOCOLON
         EQUW    PAD
         EQUW    BL
-        EQUW    LIT,'_'
+        EQUW    LIT,95
         EQUW    FILL
         EQUW    DUP
         EQUW    PFA
@@ -3449,7 +3578,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    CMOVE
         EQUW    PAD
         EQUW    COUNT
-        EQUW    LIT,$1F
+        EQUW    LIT,31
         EQUW    AND
         EQUW    TYPE
         EQUW    SPACE
@@ -5024,7 +5153,48 @@ ENDIF
         EQUW    LITERAL
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       VLIST
+;
+;       > Display, on the output device, a list of the names of all words in
+;       > the CONTEXT vocabulary and any other vocabulary to which the CONTEXT
+;       > vocabulary is chained. All VLISTs will therefore include a listing of
+;       > the words in the FORTH vocabulary. The listing can be interrupted by
+;       > pressing the Tab key and resumed by pressing the Space Bar. If, after
+;       > interruption, any key except the Space Bar is pressed, the listing
+;       > will be aborted.
+;
+;       : VLIST
+;        128 OUT !
+;        CONTEXT @ @
+;        BEGIN
+;         OUT @ C/L > IF
+;          CR
+;          0 OUT !
+;         THEN
+;         DUP ID. SPACE SPACE
+;         PFA LFA @ DUP
+;         ?TAB IF
+;          BEGIN  ?TAB NOT  UNTIL
+;          KEY BL = IF -1 ELSE 0 THEN
+;         THEN
+;         AND
+;        UNTIL
+;        DROP
+;       ;
+;
+;      ??? Why the check on whether more than C/L (typically 64) characters
+;      have been printed, after which a CR is output? Quite odd, as in any
+;      80-column mode this results in not using all available space, and in the
+;      other 20- and 40-column modes it introduces line breaks at unnecessary
+;      places.
+;
+;      ??? Why the pausing when tab is pressed and unpausing when the space bar
+;      is pressed? The Acorn MOS uses ^N throughout to enable pagination and ^O
+;      to disable it (VDU 14 and 15), which most users would be familiar with.
+;
+; -----------------------------------------------------------------------------
 
 .VLIST_NFA
         DEFWORD "VLIST"
@@ -5078,6 +5248,10 @@ ENDIF
 ;       > The action assigned to a newly-created execution vector. See
 ;       > EXCVEC: .
 ;
+;       : NOVEC
+;        12 ERROR
+;       ;
+;       
 ; -----------------------------------------------------------------------------
 
 .NOVEC_NFA
@@ -5978,14 +6152,23 @@ ELSE
 REL = 0
 ENDIF
 
-;       EMIT
+; -----------------------------------------------------------------------------
+;
+;       EMIT   ( c ... )
+;
+;       > A vectored routine, initialised on a COLD start to execute (EMIT) ,
+;       > which transmits ASCII character c to the output device. The contents
+;       > of OUT are incremented for each character output. The stack value is
+;       > masked to a 7-bit value before transmission.
+;
+; -----------------------------------------------------------------------------
 
 .L9FFB  DEFWORD "EMIT"
-        EQUW    L846A
+        EQUW    BRACKETEMIT_NFA
 .XEMIT  EQUW    DOEXVEC
         EQUW    BRACKETEMIT
 
-EMIT    =       XEMIT-REL
+EMIT = XEMIT-REL
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6003,7 +6186,7 @@ EMIT    =       XEMIT-REL
 .XKEY   EQUW    DOEXVEC
         EQUW    BRACKETKEY
 
-KEY     =       XKEY-REL
+KEY = XKEY-REL
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6020,7 +6203,7 @@ KEY     =       XKEY-REL
 .XFIRS  EQUW    DOCONSTANT
         EQUW    BUF1
 
-FIRST   =       XFIRS-REL
+FIRST = XFIRS-REL
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6036,7 +6219,7 @@ FIRST   =       XFIRS-REL
 .XLIMI  EQUW    DOCONSTANT
         EQUW    EM
 
-LIMIT   =       XLIMI-REL
+LIMIT = XLIMI-REL
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6059,7 +6242,7 @@ LIMIT   =       XLIMI-REL
         EQUW    DOEXVEC
         EQUW    BRACKETCREATE
 
-CREATE  =       XCREATE-REL
+CREATE = XCREATE-REL
 
 ;       NUM
 

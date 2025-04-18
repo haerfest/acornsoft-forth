@@ -1,10 +1,6 @@
-;
-; BBC FORTH ROM DISASSEMBLY
-;
-
 ; -----------------------------------------------------------------------------
 ;
-;       MACROS
+;       Macros used to define words.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -13,20 +9,20 @@ MACRO DEFENTRY flags%,name$
         IF LEN(name$)>1
                 EQUB MID$(name$,1,LEN(name$)-1)
         ENDIF
-        EQUB $80+ASC(RIGHT$(name$,1))
+        EQUB %10000000+ASC(RIGHT$(name$,1))
 ENDMACRO
 
 MACRO DEFWORD name$
-        DEFENTRY $80,name$
+        DEFENTRY %10000000,name$
 ENDMACRO
 
 MACRO DEFIMM name$
-        DEFENTRY $C0,name$
+        DEFENTRY %11000000,name$
 ENDMACRO
 
 ; -----------------------------------------------------------------------------
 ;
-;       FORTH CONFIGURATION FLAGS
+;       Forth build configuration flags.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -35,32 +31,26 @@ REMOVE_UNREACHABLES =? FALSE
 
 ; -----------------------------------------------------------------------------
 ;
-;       OPERATING SYSTEM CALLS
+;       Acorn MOS (Machine Operating System) system call interface.
 ;
 ; -----------------------------------------------------------------------------
 
-BRKV                    = $0202
+BRKV   = $0202
+OSARGS = $FFDA
+OSBYTE = $FFF4
+OSCLI  = $FFF7
+OSFIND = $FFCE
+OSGBPB = $FFD1
+OSNEWL = $FFE7
+OSRDCH = $FFE0
+OSWORD = $FFF1
+OSWRCH = $FFEE
 
-OSARGS                  = $FFDA
-OSBYTE                  = $FFF4
-OSCLI                   = $FFF7
-OSFIND                  = $FFCE
-OSGBPB                  = $FFD1
-OSNEWL                  = $FFE7
-OSRDCH                  = $FFE0
-OSWORD                  = $FFF1
-OSWRCH                  = $FFEE
-
-CarriageReturn          = $0D
 ClearEscapeCondition    = $7E
 EnterLanguageRom        = $8E
 EscapeFlag              = $FF
-EscapeKey               = $1B
 FlushBufferClass        = $0F
-JmpIndirectOpcode       = $6C
-LineFeed                = $0A
 OpenFileInputOutput     = $C0
-PrintStrPtr             = $12
 ReadDisplayAddr         = $85
 ReadHighOrderAddr       = $82
 ReadHighWaterMark       = $83
@@ -71,33 +61,45 @@ SetKeyboardRepeatDelay  = $0B
 SetKeyboardRepeatPeriod = $0C
 
 ; -----------------------------------------------------------------------------
+;
+;       Various constants used through the code.
+;
+; -----------------------------------------------------------------------------
 
-BOS     =       $10             ; BOTTOM OF DATA STACK
-TOS     =       $58             ; TOP OF DATA STACK
-N       =       $60             ; SCRATCH WORKSPACE
-XSAVE   =       $68             ; TEMPORARY FOR X REGISTER
-W       =       XSAVE+2         ; CODE FIELD POINTER
-IP      =       W+2             ; INTERPRETIVE POINTER
-UP      =       IP+2            ; USER AREA POINTER
+CarriageReturn          = $0D
+EscapeKey               = $1B
+JmpIndirectOpcode       = $6C
+LineFeed                = $0A
+PrintStrPtr             = $12
 
-WBSIZ   =       1+255+2         ; WORD BUFFER SIZE
+; -----------------------------------------------------------------------------
 
-UAREA   =       $400            ; USER AREA
-WORDBU  =       UAREA+64        ; WORD BUFFER
-TIBB    =       WORDBU+WBSIZ    ; TERMINAL INPUT BUFFER
-PADD    =       TIBB+126        ; PAD
-RAM     =       PADD+80         ; RAM RELOCATION ADDR ($610)
+BOS    = $10             ; Bottom of the data stack.
+TOS    = $58             ; Top of the data stack.
+N      = $60             ; Scratch workspace for various use.
+XSAVE  = $68             ; Location to temporarily save the X register.
+W      = XSAVE+2         ; Code field pointer.
+IP     = W+2             ; Interpretive Pointer ("PC"), points to current cell.
+UP     = IP+2            ; User Area pointer, points to UAREA .
 
-EM      =       $7C00           ; END OF MEMORY+1
-BLKSIZ  =       1024
-HDBT    =       BLKSIZ+4
-NOBUF   =       2
-BUFS    =       NOBUF*HDBT
-BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
+WBSIZ  = 1+255+2         ; WORD BUFFER SIZE
+
+UAREA  = $400            ; The location of the user area, pointed to by UP .
+WORDBU = UAREA+64        ; WORD BUFFER
+TIBB   = WORDBU+WBSIZ    ; TERMINAL INPUT BUFFER
+PADD   = TIBB+126        ; PAD
+RAM    = PADD+80         ; RAM RELOCATION ADDR ($610)
+
+EM     = $7C00           ; END OF MEMORY+1
+BLKSIZ = 1024
+HDBT   = BLKSIZ+4
+NOBUF  = 2
+BUFS   = NOBUF*HDBT
+BUF1   = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       ROM HEADER
+;       ROM header.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -117,22 +119,31 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         EQUB    "(C) Acornsoft Ltd. 1983",0
         EQUW    RomStart
 
-        EQUW    0                       ; UNUSED
+        EQUW    0               ; Unused.
 
 .ColdWarmStartStr
         EQUB    LineFeed,CarriageReturn
         EQUB    "COLD or WARM start (C/W)? ",0
 
-        EQUB    0                       ; UNUSED
+        EQUB    0               ; Unused.
+
+; -----------------------------------------------------------------------------
+;
+;       Prints a zero-terminated string located in its entirety in lower ROM
+;       area $80xx. Before entry, zero-page location PrintStrPtr should be set
+;       to the offset of the beginning of the string to the ROM address $8000,
+;       as it is used as a two-byte pointer to the string.
+;
+; -----------------------------------------------------------------------------
 
 .PrintStr
-        LDA     #>RomStart
+        LDA     #>RomStart      ; Set the high byte of the pointer to $80xx.
         STA     PrintStrPtr+1
-        LDY     #0
+        LDY     #0              ; Start with the first character to print.
 .PrintChr
-        LDA     (PrintStrPtr),Y
-        BEQ     PrintStrDone
-        JSR     OSWRCH
+        LDA     (PrintStrPtr),Y ; Fetch the next character to print. If it is
+        BEQ     PrintStrDone    ; a zero byte, return, otherwise print it and
+        JSR     OSWRCH          ; move on to the next character.
         INY
         BNE     PrintChr
 .PrintStrDone
@@ -140,7 +151,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       SERVICE ENTRY
+;       Service ROM entry point.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -230,7 +241,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       LANGUAGE ENTRY
+;       Language ROM entry point.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -265,11 +276,11 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 .UserChoseWarm
         JMP     JumpWarm
 
-        EQUB    $FF,$FF                         ; UNUSED
+        EQUB    $FF,$FF         ; Unused.
 
 ; -----------------------------------------------------------------------------
 ;
-;       FORTH ORIGIN
+;       Forth proper starts here. See +ORIGIN .
 ;
 ; -----------------------------------------------------------------------------
 
@@ -278,70 +289,82 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 .ORIGIN
         NOP
         NOP
-
 .JumpCold
         JMP     COLD+2
 .JumpWarm
         JMP     WARM+2
 
-.PtrToSTART
-        EQUW    START+2
-.PtrToPABORT
-        EQUW    BRACKETABORT+2
+; -----------------------------------------------------------------------------
+;
+;       ??? Why not refer to these words directly? These bytes may need to be
+;       there for +ORIGIN to work, so they would go unused, but there is no
+;       need for this indirection.
+;
+; -----------------------------------------------------------------------------
+
+.PtrToStartPFA
+        EQUW    START+2         ; Referred to by COLD .
+.PtrToBracketAbortPFA
+        EQUW    BRACKETABORT+2  ; Referred to by WARM .
 
 ; -----------------------------------------------------------------------------
 ;
-;       BOOT-UP PARAMETERS
+;       At start-up, the user variable pointer UP is reset to point to UAREA
+;       and (part of) the boot-up parameters below in there are reset to their
+;       default values.  See the routine at Restart .
 ;
 ; -----------------------------------------------------------------------------
 
 .BootUpParameters
-        EQUW    TOPNFA          ; $0C +ORIGIN: ?
-        EQUW    $7F             ; $0E +ORIGIN: backspace character
+        EQUW    TOPNFA          ; (UP),0   = $0C +ORIGIN: ?
+        EQUW    $7F             ; (UP),2   = $0E +ORIGIN: backspace character
 .InitialUP
-        EQUW    UAREA           ; $10 +ORIGIN: initial UP
-        EQUW    TOS             ; $12 +ORIGIN: initial S0
-        EQUW    $01FF           ; $14 +ORIGIN: initial R0
-        EQUW    TIBB            ; $16 +ORIGIN: initial TIB
-        EQUW    31              ; $18 +ORIGIN: initial WIDTH
-        EQUW    0               ; $1A +ORIGIN: initial WARNING
-        EQUW    TOPDP           ; $1C +ORIGIN: initial FENCE
-        EQUW    TOPDP           ; $1E +ORIGIN: initial DP
-        EQUW    VL0-REL         ; $20 +ORIGIN: initial VOC-LINK
-        EQUW    1               ; $22 +ORIGIN: initial LK
+        EQUW    UAREA           ; (UP),4   = $10 +ORIGIN: initial UP
+        EQUW    TOS             ; (UP),6   = $12 +ORIGIN: initial S0
+        EQUW    $01FF           ; (UP),8   = $14 +ORIGIN: initial R0
+        EQUW    TIBB            ; (UP),$10 = $16 +ORIGIN: initial TIB
+        EQUW    31              ; (UP),$12 = $18 +ORIGIN: initial WIDTH
+        EQUW    0               ; (UP),$14 = $1A +ORIGIN: initial WARNING
+        EQUW    TOPDP           ; (UP),$16 = $1C +ORIGIN: initial FENCE
+        EQUW    TOPDP           ; (UP),$18 = $1E +ORIGIN: initial DP
+        EQUW    VL0-REL         ; (UP),$1A = $20 +ORIGIN: initial VOC-LINK
+        EQUW    1               ; (UP),$1C = $22 +ORIGIN: initial LK
 
         EQUB    "RdeG-H"        ; Author Richard de Grandis-Harrison
 
-.PtrToBrkHandler
-        EQUW    BrkHandler
-.PtrToESCAPE
-        EQUW    ESCAPE+2
-.PtrToOSERROR
-        EQUW    OSERR+2
-
 ; -----------------------------------------------------------------------------
 ;
-;       RESTART
+;       ??? Why not refer to these words directly? There is no need for this
+;       indirection.
 ;
+; -----------------------------------------------------------------------------
+
+.PtrToBrkHandler
+        EQUW    BrkHandler      ; Referred to by COLD and WARM .
+.PtrToEscapePFA
+        EQUW    ESCAPE+2        ; Referred to by EscapeHandler .
+.PtrToOSErrorPFA
+        EQUW    OSERR+2         ; Referred to by BrkHandler .
+
 ; -----------------------------------------------------------------------------
 
 .Restart
-        LDA     InitialUP+1
-        STA     UP+1
+        LDA     InitialUP+1             ; Reset the User Pointer (UP) to its
+        STA     UP+1                    ; initial value UAREA .
         LDA     InitialUP
         STA     UP
 
 .ResetUserVariables
-        LDA     BootUpParameters,Y
-        STA     (UP),Y
+        LDA     BootUpParameters,Y      ; Reset the first #Y bytes of the user
+        STA     (UP),Y                  ; variables pointed at by UP .
         DEY
         BPL     ResetUserVariables
 
-        LDA     #JmpIndirectOpcode
-        STA     W-1
+        LDA     #JmpIndirectOpcode      ; Prepare a JMP (...) instruction at W,
+        STA     W-1                     ; which is self-modified by NEXT .
 
         CLD
-        JMP     RPSTORE+2               ; RUN FORTH
+        JMP     RPSTORE+2               ; Execute RP!
 
 ; -----------------------------------------------------------------------------
 ;
@@ -356,48 +379,59 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 
 .LIT_NFA
         DEFWORD "LIT"
-        EQUW    0               ; FIRST WORD IN DICTIONARY
+        EQUW    0               ; We are the first word in the dictionary.
 .LIT
         EQUW    *+2
-        LDA     (IP),Y          ; LOAD LO BYTE OF LITERAL
-        PHA                     ; PUSH ONTO STACK
-        INC     IP              ; INCREMENT IP
+        LDA     (IP),Y          ; Load the low byte of the literal value from
+        PHA                     ; the parameter field, and push it onto the
+        INC     IP              ; return stack. Then increment IP .
         BNE     L815B
         INC     IP+1
-.L815B  LDA     (IP),Y          ; LOAD HI BYTE OF LITERAL
-        INC     IP              ; INCREMENT IP
-        BNE     PUSH            ; PUSH LITERAL ONTO DATA STACK
-        INC     IP+1
+.L815B  LDA     (IP),Y          ; Load the high byte of the literal value from
+        INC     IP              ; the parameter field into the accumulator, and
+        BNE     PUSH            ; increment IP . Then fall through to PUSH it
+        INC     IP+1            ; as a new cell onto the data stack.
 
-.PUSH   DEX                     ; MAKE ROOM ON DATA STACK FOR
-        DEX                     ; 16-BIT VALUE
+; -----------------------------------------------------------------------------
 
-.PUT    STA     1,X             ; STORE 16-BIT VALUE FROM A AND
-        PLA                     ; RETURN STACK ONTO DATA STACK
-        STA     0,X
+.PUSH   DEX                     ; Make room for a new cell on the data stack.
+        DEX
 
-.NEXT   LDY     #1              ; W := (IP)
-.NEXTY1 LDA     (IP),Y
-        STA     W+1
-        DEY
-        LDA     (IP),Y
+.PUT    STA     1,X             ; Write the new cell to the data stack,
+        PLA                     ; consisting of the accumulator (high byte)
+        STA     0,X             ; and the value on top of the return stack
+                                ; (low byte). Fall through to exeucting the
+                                ; next word.
+
+; -----------------------------------------------------------------------------
+
+.NEXT   LDY     #1              ; With IP pointing to the CFA of the next word
+.NEXTY1 LDA     (IP),Y          ; to execute, store what CFA points to at the
+        STA     W+1             ; code field pointer W . That is part of an
+        DEY                     ; indirect JMP (...) instruction, meaning we
+        LDA     (IP),Y          ; are modifying that instruction from here.
         STA     W
 
-        CLC                     ; IP := IP + 2
-        LDA     IP
-        ADC     #2
-        STA     IP
-        BCC     CheckEscape
+        CLC                     ; Increment IP by two, so it points to the PFA
+        LDA     IP              ; of this word. If the word is a colon
+        ADC     #2              ; definition, the Parameter Field will contain
+        STA     IP              ; the addresses of the CFA's of each word that
+        BCC     CheckEscape     ; was compiled in and needs to be executed.
         INC     IP+1
 
 .CheckEscape
-        BIT     EscapeFlag
-        BMI     EscapePressed
+        BIT     EscapeFlag      ; Like with BBC Basic, execution can be stopped
+        BMI     EscapePressed   ; by pressing the escape key.
 
-        JMP     W-1             ; JMP (W)
+        JMP     W-1             ; Perform a (modified) indirect jump JMP (...)
+                                ; to what the CFA of this word points to.
 
 .EscapePressed
-        JMP     EscapeHandler
+        JMP     EscapeHandler   ; Jump to the escape handler. ??? Why not
+                                ; insert its body here to save the three bytes
+                                ; of the jump instruction?
+
+; -----------------------------------------------------------------------------
 
 .SETUP  ASL     A
         STA     $5F
@@ -921,21 +955,27 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    L8431
 .SPSTORE
         EQUW    *+2
-        LDY     #6
-        LDA     (UP),Y
-        TAX
+        LDY     #6              ; Transfer the low byte of the S0 user variable
+        LDA     (UP),Y          ; to register X, which acts as the computation
+        TAX                     ; stack pointer in zero page $0000 - $00FF.
         JMP     NEXT
 
+; -----------------------------------------------------------------------------
+;
 ;       RP!
+;
+;       > Initialises the return stack pointer.
+;
+; -----------------------------------------------------------------------------
 
 .L8455  DEFWORD "RP!"
         EQUW    L8445
 .RPSTORE
         EQUW    *+2
         STX     XSAVE
-        LDY     #8
-        LDA     (UP),Y
-        TAX
+        LDY     #8              ; Transfer the low byte of the R0 user variable  
+        LDA     (UP),Y          ; to the hardware stack register SP, which
+        TAX                     ; always resides at $0100 - $01FF.
         TXS
 .L8465  LDX     XSAVE
         JMP     NEXT
@@ -2014,7 +2054,8 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       S0   ( ... addr )
 ;
-;       HEX 06 USER S0
+;       > A user variable containing the address which marks the initial top of
+;       > the computation stack.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -2024,7 +2065,14 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 .SZERO  EQUW    DOUSER
         EQUB    $06
 
-;       R0
+; -----------------------------------------------------------------------------
+;
+;       R0   ( ... addr )
+;
+;       > A user variable containing the initial address of the top of the
+;       > return stack.
+;
+; -----------------------------------------------------------------------------
 
 .RZERO_NFGA
         DEFWORD "R0"
@@ -3821,7 +3869,7 @@ BUF1    =       EM-BUFS         ; FIRST BLOCK BUFFER
 .START  EQUW    DOCOLON
         EQUW    SPSTORE
 
-IF KEEP_IN_ROM=FALSE
+IF NOT(KEEP_IN_ROM)
 
         EQUW    LIT,L9FFB
         EQUW    LIT,RAM
@@ -3858,21 +3906,22 @@ ENDIF
 
 ; -----------------------------------------------------------------------------
 ;
-;       ESCAPE PRESSED HANDLER
+;       Handler for the user pressing the escape key during execution. Called
+;       from NEXT when it detects the operating system has set the escape flag.
 ;
 ; -----------------------------------------------------------------------------
 
 .EscapeHandler
-        LDA     #ClearEscapeCondition
-        JSR     OSBYTE
+        LDA     #ClearEscapeCondition   ; Tell the OS the escape press has been
+        JSR     OSBYTE                  ; dealt with.
 
-        LDA     PtrToESCAPE+1
-        STA     IP+1
-        LDA     PtrToESCAPE
+        LDA     PtrToEscapePFA+1        ; Set IP to point to the PFA of the 
+        STA     IP+1                    ; ESCAPE word, so that will be executed
+        LDA     PtrToEscapePFA          ; next.
         STA     IP
 
-        LDY     #$0F
-        JMP     Restart
+        LDY     #$0F                    ; Reset the first eight user variables
+        JMP     Restart                 ; and restart Forth.
 
 ; -----------------------------------------------------------------------------
 ;
@@ -3881,9 +3930,9 @@ ENDIF
 ; -----------------------------------------------------------------------------
 
 .BrkHandler
-        LDA     PtrToOSERROR+1
+        LDA     PtrToOSErrorPFA+1
         STA     IP+1
-        LDA     PtrToOSERROR
+        LDA     PtrToOSErrorPFA
         STA     IP
 
         LDY     #$0F
@@ -3913,9 +3962,9 @@ ENDIF
         LDA     PtrToBrkHandler
         STA     BRKV
 
-        LDA     PtrToSTART+1
+        LDA     PtrToStartPFA+1
         STA     IP+1
-        LDA     PtrToSTART
+        LDA     PtrToStartPFA
         STA     IP
 
         LDY     #$15
@@ -3937,9 +3986,9 @@ ENDIF
         EQUW    COLD_NFA
 .WARM   EQUW    *+2
 
-        LDA     PtrToPABORT+1
+        LDA     PtrToBracketAbortPFA+1
         STA     IP+1
-        LDA     PtrToPABORT
+        LDA     PtrToBracketAbortPFA
         STA     IP
 
         LDA     PtrToBrkHandler+1
@@ -4238,7 +4287,7 @@ ENDIF
         EQUW    MINUS
         EQUW    EXIT
 
-        EQUB    $66             ; UNUSED
+        EQUB    $66             ; Unused.
 
 ;       SIGN
 
@@ -5656,7 +5705,7 @@ ENDIF
 
 ; START OF BLOCK RELOCATED TO RAM
 
-IF      KEEP_IN_ROM=TRUE
+IF      KEEP_IN_ROM
 
 REL     =       0
 

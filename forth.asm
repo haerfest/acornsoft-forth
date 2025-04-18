@@ -622,19 +622,19 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         STA     $102,X
 .CHECKLOOPDONE
         CLC
-        LDA     $103,X          ; Access the loop maximum from the return stack
+        LDA     $103,X          ; Access the loop maximum on the return stack
         SBC     $101,X          ; and subtract the current loop index, to see
         LDA     $104,X          ; whether we are done. The accumulator ends up
         SBC     $102,X          ; with the high byte of the subtraction.
         BVC     LOOPAGAIN       ; Check whether to loop again if there is no
         EOR     #$80            ; sign error, otherwise correct the sign first.
 .LOOPAGAIN
-        BPL     DOBRANCHX       ; Loop again when the maximim has not been
+        BPL     DOBRANCHX       ; Loop again when the maximum has not been
                                 ; reached yet.
 .LOOPDONE
         LDX     XSAVE           ; Restore the return stack pointer and remove
-        PLA                     ; the loop index and loop maximum from the
-        PLA                     ; return stack.
+        PLA                     ; the loop index and loop maximum from it.
+        PLA
         PLA
         PLA
         JMP     BUMPIP          ; Then bump IP beyond the branch offset in the

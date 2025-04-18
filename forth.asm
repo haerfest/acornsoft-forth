@@ -691,7 +691,11 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > addresses. It is not available to the user in the system as provided
 ;       > but can be made so by entering the following definition:
 ;       >
-;       > : ULOOP   3 ?PAIRS COMPILE (ULOOP) BACK ; IMMEDIATE
+;       > : ULOOP
+;       >  3 ?PAIRS
+;       >  COMPILE (ULOOP)
+;       >  BACK
+;       > ; IMMEDIATE
 ;       >
 ;       > It may then be used in a colon-definition as:
 ;       >
@@ -2699,7 +2703,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8CCB  DEFWORD "COMPILE"
+.COMPILE_NFA
+        DEFWORD "COMPILE"
         EQUW    IMMEDIATE_NFA
 .COMPILE
         EQUW    DOCOLON
@@ -2712,20 +2717,49 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    COMMA
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       [
+;
+;       > Used in the creation of a colon-definition in the form:
+;       >
+;       > : NNNN ... [ ... ] ... ;
+;       >
+;       > It suspends compilation of the definition and allows the subsequent
+;       > input to be executed. See ] .
+;
+;       : [
+;        0 STATE !
+;       ; IMMEDIATE
+;
+; -----------------------------------------------------------------------------
 
-.L8CE7  DEFIMM  "["
-        EQUW    L8CCB
+.LBRAC_NFA
+        DEFIMM  "["
+        EQUW    COMPILE_NFA
 .LBRAC  EQUW    DOCOLON
         EQUW    ZERO
         EQUW    STATE
         EQUW    STORE
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ]
+;
+;       > Used during execution mode to force compilation of the subsequent
+;       > input. See [ .
+;
+;       : ]
+;        $C0 STATE !
+;        EXIT
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.L8CF5  DEFWORD "]"
-        EQUW    L8CE7
+.RBRAC_NFA
+        DEFWORD "]"
+        EQUW    LBRAC_NFA
 .RBRAC  EQUW    DOCOLON
         EQUW    LIT,$C0
         EQUW    STATE
@@ -2734,15 +2768,28 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       NOOP
 
-.L8D05  DEFWORD "NOOP"
-        EQUW    L8CF5
+; -----------------------------------------------------------------------------
+;
+;       NOOP
+;
+;       > A no-operation in FORTH. One possible use is to reserve address space
+;       > in a colon-definition for later over-writing by the execution address
+;       > of a subsequent definition.
+;
+;       : NOOP  EXIT  ;
+;
+; -----------------------------------------------------------------------------
+
+.NOOP_NFA
+        DEFWORD "NOOP"
+        EQUW    RBRAC_NFA
 .NOOP   EQUW    DOCOLON
         EQUW    EXIT
 
 ;       ?TAB
 
 .L8D10  DEFWORD "?TAB"
-        EQUW    L8D05
+        EQUW    NOOP_NFA
 .QTAB   EQUW    DOCOLON
         EQUW    LIT,$FF9F
         EQUW    QUERYKEY
@@ -2825,6 +2872,14 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       >
 ;       > will create a new word CCCC. When CCCC is itself executed it action
 ;       > will be determined by the machine code following ;CODE in NNNN .
+;
+;       : ;CODE
+;        ?CSP
+;        COMPILE (;CODE)
+;        [ ASSEMBLER
+;        !CSP
+;        EXIT
+;       ; IMMEDATE
 ;
 ; -----------------------------------------------------------------------------
 
@@ -4695,7 +4750,7 @@ ENDIF
 ;        COMPILE (LOOP)
 ;        BACK
 ;        EXIT
-;       ;
+;       ; IMMEDIATE
 ;
 ; -----------------------------------------------------------------------------
 

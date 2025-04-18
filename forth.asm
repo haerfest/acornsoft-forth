@@ -4469,7 +4469,8 @@ ENDIF
 
 ;       H.
 
-.L97D3  DEFWORD "H."
+.HDOT_NFA
+        DEFWORD "H."
         EQUW    L97BA
 .HDOT   EQUW    DOCOLON
         EQUW    BASE
@@ -4489,15 +4490,16 @@ ENDIF
 ;
 ;       : MSG#
 ;        ?DUP IF
-;         (.") [ 6 C, 'M' C, 'S' C, 'G' C, ' ' C, '#' C, ' ' C, ]
+;         (.") [ 6 C, CHAR M C, CHAR S C, CHAR G C, 32 C, CHAR # C, 32 C, ]
 ;         DEC.
 ;        THEN
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
 
-.L97EA  DEFWORD "MSG#"
-        EQUW    L97D3
+.MSGNUM_NFA
+        DEFWORD "MSG#"
+        EQUW    HDOT_NFA
 .MSGNUM EQUW    DOCOLON
         EQUW    QUERYDUP
         EQUW    ZEROBRANCH,$D
@@ -4508,7 +4510,8 @@ ENDIF
 
 ;       2*
 
-.L9806  DEFWORD "2*"
+.TSTAR_NFA
+        DEFWORD "2*"
         EQUW    LA05B-REL
 .TSTAR  EQUW    *+2
         ASL     0,X
@@ -4517,8 +4520,9 @@ ENDIF
 
 ;       2/
 
-.L9814  DEFWORD "2/"
-        EQUW    L9806
+.TSLAS_NFA
+        DEFWORD "2/"
+        EQUW    TSTAR_NFA
 .TSLAS  EQUW    *+2
         CLC
         LDA     1,X
@@ -4534,8 +4538,9 @@ ENDIF
 
 ;       J
 
-.L9830  DEFWORD "J"
-        EQUW    L9814
+.JDO_NFA
+        DEFWORD "J"
+        EQUW    TSLAS_NFA
 .JDO    EQUW    DOCOLON
         EQUW    RPFETCH
         EQUW    LIT,7
@@ -4557,8 +4562,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9842  DEFWORD "BACK"
-        EQUW    L9830
+.BACK_NFA
+        DEFWORD "BACK"
+        EQUW    JDO_NFA
 .BACK   EQUW    DOCOLON
         EQUW    HERE
         EQUW    MINUS
@@ -4567,8 +4573,8 @@ ENDIF
 
 ;       DO
 
-.L9853  DEFIMM  "DO"
-        EQUW    L9842
+.DO_NFA DEFIMM  "DO"
+        EQUW    BACK_NFA
 .DO     EQUW    DOCOLON
         EQUW    COMPILE
         EQUW    XDO
@@ -4578,8 +4584,9 @@ ENDIF
 
 ;       LOOP
 
-.L9866  DEFIMM  "LOOP"
-        EQUW    L9853
+.LOOP_NFA
+        DEFIMM  "LOOP"
+        EQUW    DO_NFA
 .LOOP   EQUW    DOCOLON
         EQUW    LIT,3
         EQUW    QUERYPAIRS
@@ -4590,8 +4597,9 @@ ENDIF
 
 ;       +LOOP
 
-.L987D  DEFIMM  "+LOOP"
-        EQUW    L9866
+.PLOOP_NFA
+        DEFIMM  "+LOOP"
+        EQUW    LOOP_NFA
 .PLOOP  EQUW    DOCOLON
         EQUW    LIT,3
         EQUW    QUERYPAIRS
@@ -4602,8 +4610,8 @@ ENDIF
 
 ;       IF
 
-.L9895  DEFIMM  "IF"
-        EQUW    L987D
+.IF_NFA DEFIMM  "IF"
+        EQUW    PLOOP_NFA
 .IF     EQUW    DOCOLON
         EQUW    COMPILE
         EQUW    ZEROBRANCH
@@ -4615,8 +4623,9 @@ ENDIF
 
 ;       THEN
 
-.L98AA  DEFIMM  "THEN"
-        EQUW    L9895
+.THEN_NFA
+        DEFIMM  "THEN"
+        EQUW    IF_NFA
 .THEN   EQUW    DOCOLON
         EQUW    QUERYCOMP
         EQUW    TWO
@@ -4630,8 +4639,9 @@ ENDIF
 
 ;       ELSE
 
-.L98C5  DEFIMM  "ELSE"
-        EQUW    L98AA
+.ELSE_NFA
+        DEFIMM  "ELSE"
+        EQUW    THEN_NFA
 .ELSE   EQUW    DOCOLON
         EQUW    TWO
         EQUW    QUERYPAIRS
@@ -4668,8 +4678,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L98E6  DEFIMM  "BEGIN"
-        EQUW    L98C5
+.BEGIN_NFA
+        DEFIMM  "BEGIN"
+        EQUW    ELSE_NFA
 .BEGIN  EQUW    DOCOLON
         EQUW    QUERYCOMP
         EQUW    HERE
@@ -4678,8 +4689,9 @@ ENDIF
 
 ;       UNTIL
 
-.L98F8  DEFIMM  "UNTIL"
-        EQUW    L98E6
+.UNTIL_NFA
+        DEFIMM  "UNTIL"
+        EQUW    BEGIN_NFA
 .UNTIL  EQUW    DOCOLON
         EQUW    ONE
         EQUW    QUERYPAIRS
@@ -4709,8 +4721,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L990E  DEFIMM  "AGAIN"
-        EQUW    L98F8
+.AGAIN_NFA
+        DEFIMM  "AGAIN"
+        EQUW    UNTIL_NFA
 .AGAIN  EQUW    DOCOLON
         EQUW    ONE
         EQUW    QUERYPAIRS
@@ -4721,8 +4734,9 @@ ENDIF
 
 ;       WHILE
 
-.L9924  DEFIMM  "WHILE"
-        EQUW    L990E
+.WHILE_NFA
+        DEFIMM  "WHILE"
+        EQUW    AGAIN_NFA
 .WHILE  EQUW    DOCOLON
         EQUW    IF
         EQUW    TWOPLUS
@@ -4746,8 +4760,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9934  DEFIMM  "REPEAT"
-        EQUW    L9924
+.REPEAT_NFA
+        DEFIMM  "REPEAT"
+        EQUW    WHILE_NFA
 .REPEAT EQUW    DOCOLON
         EQUW    TOR
         EQUW    TOR
@@ -4780,7 +4795,7 @@ ENDIF
 
 .TICK_NFA
         DEFIMM  "'"
-        EQUW    L9934
+        EQUW    REPEAT_NFA
 .TICK   EQUW    DOCOLON
         EQUW    FIND
         EQUW    DUP
@@ -5869,7 +5884,7 @@ ABORT   =       XABORT-REL
 ; -----------------------------------------------------------------------------
 
 .LA05B  DEFWORD "MESSAGE"
-        EQUW    L97EA
+        EQUW    MSGNUM_NFA
 .XMESSAGE
         EQUW    DOEXVEC
         EQUW    DOLLARMSG

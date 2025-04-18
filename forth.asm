@@ -859,7 +859,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         SBC     #'0'            ; it's less than the character '0', then it
         BMI     NoDigit         ; certainly is no digit, so bail out.
         CMP     #10             ; If the numeric value is less than 10, check
-        BMI     CompareBase     ; it against the numberic base. If it is one of
+        BMI     CompareBase     ; it against the numeric base. If it is one of
         SEC                     ; the seven characters in between the digits
         SBC     #7              ; and letters, it is no digit, so bail out.
         CMP     #10             ; Otherwise, go on to compare it against the

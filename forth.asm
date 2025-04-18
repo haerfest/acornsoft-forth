@@ -26,8 +26,8 @@ ENDMACRO
 ;
 ; -----------------------------------------------------------------------------
 
-KEEP_IN_ROM         =? FALSE
-REMOVE_UNREACHABLES =? FALSE
+RELOCATE =? TRUE
+STRIP    =? FALSE
 
 ; -----------------------------------------------------------------------------
 ;
@@ -74,28 +74,28 @@ PrintStrPtr             = $12
 
 ; -----------------------------------------------------------------------------
 
-BOS    = $10             ; Bottom of the data stack.
-TOS    = $58             ; Top of the data stack.
-N      = $60             ; Scratch workspace for various use.
-XSAVE  = $68             ; Location to temporarily save the X register.
-W      = XSAVE+2         ; Code field pointer.
-IP     = W+2             ; Interpretive Pointer ("PC"), points to current cell.
-UP     = IP+2            ; User Area pointer, points to UAREA .
+BOS     = $10             ; Bottom of the data stack.
+TOS     = $58             ; Top of the data stack.
+N       = $60             ; Scratch workspace for various use.
+XSAVE   = $68             ; Location to temporarily save the X register.
+W       = XSAVE+2         ; Code field pointer.
+IP      = W+2             ; Interpretive Pointer ("PC"), points to current cell.
+UP      = IP+2            ; User Area pointer, points to UAREA .
 
-WBSIZ  = 1+255+2         ; WORD BUFFER SIZE
+WBSIZ   = 1+255+2         ; WORD BUFFER SIZE
 
-UAREA  = $400            ; The location of the user area, pointed to by UP .
-WORDBU = UAREA+64        ; WORD BUFFER
-TIBB   = WORDBU+WBSIZ    ; TERMINAL INPUT BUFFER
-PADD   = TIBB+126        ; PAD
-RAM    = PADD+80         ; RAM RELOCATION ADDR ($610)
+UAREA   = $400            ; The location of the user area, pointed to by UP .
+WORDBU  = UAREA+64        ; WORD BUFFER
+TIBB    = WORDBU+WBSIZ    ; TERMINAL INPUT BUFFER
+PADD    = TIBB+126        ; PAD
+REL_DST = PADD+80         ; RAM address to relocate certain words to ($610).
 
-EM     = $7C00           ; END OF MEMORY+1
-BLKSIZ = 1024
-HDBT   = BLKSIZ+4
-NOBUF  = 2
-BUFS   = NOBUF*HDBT
-BUF1   = EM-BUFS         ; FIRST BLOCK BUFFER
+EM      = $7C00           ; END OF MEMORY+1
+BLKSIZ  = 1024
+HDBT    = BLKSIZ+4
+NOBUF   = 2
+BUFS    = NOBUF*HDBT
+BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
@@ -316,19 +316,20 @@ BUF1   = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .BootUpParameters
-        EQUW    TOPNFA          ; (UP),0   = $0C +ORIGIN: ?
-        EQUW    $7F             ; (UP),2   = $0E +ORIGIN: backspace character
+        EQUW    TOPNFA          ; (UP),0   = $0C +ORIGIN: last word in FORTH
+                                ;                         dictionary.
+        EQUW    $7F             ; (UP),2   = $0E +ORIGIN: backspace character.
 .InitialUP
-        EQUW    UAREA           ; (UP),4   = $10 +ORIGIN: initial UP
-        EQUW    TOS             ; (UP),6   = $12 +ORIGIN: initial S0
-        EQUW    $01FF           ; (UP),8   = $14 +ORIGIN: initial R0
-        EQUW    TIBB            ; (UP),$10 = $16 +ORIGIN: initial TIB
-        EQUW    31              ; (UP),$12 = $18 +ORIGIN: initial WIDTH
-        EQUW    0               ; (UP),$14 = $1A +ORIGIN: initial WARNING
-        EQUW    TOPDP           ; (UP),$16 = $1C +ORIGIN: initial FENCE
-        EQUW    TOPDP           ; (UP),$18 = $1E +ORIGIN: initial DP
-        EQUW    VL0-REL         ; (UP),$1A = $20 +ORIGIN: initial VOC-LINK
-        EQUW    1               ; (UP),$1C = $22 +ORIGIN: initial LK
+        EQUW    UAREA           ; (UP),4   = $10 +ORIGIN: initial UP .
+        EQUW    TOS             ; (UP),6   = $12 +ORIGIN: initial S0 .
+        EQUW    $01FF           ; (UP),8   = $14 +ORIGIN: initial R0 .
+        EQUW    TIBB            ; (UP),$10 = $16 +ORIGIN: initial TIB .
+        EQUW    31              ; (UP),$12 = $18 +ORIGIN: initial WIDTH .
+        EQUW    0               ; (UP),$14 = $1A +ORIGIN: initial WARNING .
+        EQUW    TOPDP           ; (UP),$16 = $1C +ORIGIN: initial FENCE .
+        EQUW    TOPDP           ; (UP),$18 = $1E +ORIGIN: initial DP .
+        EQUW    VL0-REL         ; (UP),$1A = $20 +ORIGIN: initial VOC-LINK .
+        EQUW    1               ; (UP),$1C = $22 +ORIGIN: initial LK .
 
         EQUB    "RdeG-H"        ; Author Richard de Grandis-Harrison
 
@@ -3869,11 +3870,11 @@ BUF1   = EM-BUFS         ; FIRST BLOCK BUFFER
 .START  EQUW    DOCOLON
         EQUW    SPSTORE
 
-IF NOT(KEEP_IN_ROM)
+IF RELOCATE
 
-        EQUW    LIT,L9FFB
-        EQUW    LIT,RAM
-        EQUW    LIT,LA19F-L9FFB
+        EQUW    LIT,REL_SRC
+        EQUW    LIT,REL_DST
+        EQUW    LIT,REL_SZ
         EQUW    CMOVE
 ENDIF
         EQUW    INIVEC
@@ -4439,7 +4440,20 @@ ENDIF
         EQUW    DOT
         EQUW    EXIT
 
-;       DEC.
+; -----------------------------------------------------------------------------
+;
+;       DEC.   ( n ... )
+;
+;       > Displays n in DECIMAL base, using the format of <.>, regardless of
+;       > the current value of BASE .
+;
+;       : DEC.
+;        BASE @  SWAP
+;        DECIMAL .
+;        BASE !
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .L97BA  DEFWORD "DEC."
         EQUW    L97AE
@@ -4467,7 +4481,20 @@ ENDIF
         EQUW    STORE
         EQUW    EXIT
 
-;       MSG#
+; -----------------------------------------------------------------------------
+;
+;       MSG#   ( n ... )
+;
+;       > See MESSAGE .
+;
+;       : MSG#
+;        ?DUP IF
+;         (.") [ 6 C, 'M' C, 'S' C, 'G' C, ' ' C, '#' C, ' ' C, ]
+;         DEC.
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .L97EA  DEFWORD "MSG#"
         EQUW    L97D3
@@ -5703,16 +5730,19 @@ ENDIF
         EQUW    STORE
         EQUW    EXIT
 
-; START OF BLOCK RELOCATED TO RAM
+; -----------------------------------------------------------------------------
+;
+;       Beginning of the section of words that are by default relocated to RAM
+;       by START .
+;
+; -----------------------------------------------------------------------------
 
-IF      KEEP_IN_ROM
+REL_SRC = *
 
-REL     =       0
-
+IF RELOCATE
+REL = REL_SRC-REL_DST
 ELSE
-
-REL     =       *-RAM
-
+REL = 0
 ENDIF
 
 ;       EMIT
@@ -5827,7 +5857,16 @@ FORTH   =       XFORT-REL
 
 ABORT   =       XABORT-REL
 
-;       MESSAGE
+; -----------------------------------------------------------------------------
+;
+;       MESSAGE   ( n ... )
+;
+;       > A vectored error routine initialised on a cold start to execute MSG#
+;       > which displays n as an error message number.
+;
+;       Note that it is actually set to execute $MSG in this ROM version.
+;
+; -----------------------------------------------------------------------------
 
 .LA05B  DEFWORD "MESSAGE"
         EQUW    L97EA
@@ -6047,7 +6086,15 @@ AMODE   =       XMOD-REL
 
 EDITOR  =       XEDITOR-REL
 
-; END OF BLOCK RELOCATED TO RAM
+
+; -----------------------------------------------------------------------------
+;
+;       End of the section of words that is by default relocated to RAM by
+;       START .
+;
+; -----------------------------------------------------------------------------
+
+REL_SZ = *-REL_SRC
 
 ;       DISK
 
@@ -8137,7 +8184,13 @@ EDITOR  =       XEDITOR-REL
 
 TOPNFA  =       *
 
-;       $MSG
+; -----------------------------------------------------------------------------
+;
+;       $MSG   ( n ... )
+;
+;       > See MESSAGE .
+;
+; -----------------------------------------------------------------------------
 
 .LB107  DEFWORD "$MSG"
         EQUW    LB0E0
@@ -8166,7 +8219,14 @@ TOPNFA  =       *
         EQUW    MSGNUM
         EQUW    EXIT
 
-IF REMOVE_UNREACHABLES=FALSE
+; -----------------------------------------------------------------------------
+;
+;       The following words are present in the original ROM but not accessible
+;       because the FORTH vocabulary ends with $MSG above.
+;
+; -----------------------------------------------------------------------------
+
+IF NOT(STRIP)
 
 ;       MM
 

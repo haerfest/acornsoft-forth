@@ -407,7 +407,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 ;
 ;       > Replace the current top stack item from the accumulator and return
-;       > stack (as for PUSH)and execute NEXT .
+;       > stack (as for PUSH) and execute NEXT .
 ;
 ; -----------------------------------------------------------------------------
 
@@ -744,21 +744,28 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDX     XSAVE
         JMP     PUSH
 
+; -----------------------------------------------------------------------------
 ;       (DO)
+;
+;       > The run-time procedure compiled by DO . It moves the loop control
+;       > parameters to the return stack. See DO .
+;
+; -----------------------------------------------------------------------------
 
 .XDO_NFA
         DEFWORD "(DO)"
         EQUW    IDO_NFA
 .XDO
         EQUW    *+2
-        LDA     3,X
-        PHA
+        LDA     3,X             ; Push the two cells at the top of the data
+        PHA                     ; stack onto the return stack.
         LDA     2,X
         PHA
         LDA     1,X
         PHA
         LDA     0,X
-        PHA
+        PHA                     ; Then fall through to POPTWO to adjust the
+                                ; data stack and continue on to NEXT .
 
 ; -----------------------------------------------------------------------------
 ;
@@ -799,11 +806,11 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         STX     XSAVE
         LDA     #ReadHighOrderAddr
         JSR     OSBYTE
-        TXA
-        LDX     XSAVE
+        TXA                     ; After the OSBYTE call, registers X and Y
+        LDX     XSAVE           ; contain the high order address.
         PHA
         TYA
-        JMP     PUSH
+        JMP     PUSH            ; PUSH them on the data stack and go to NEXT .
 
 ; -----------------------------------------------------------------------------
 ;
@@ -824,42 +831,53 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         TAX
         LDA     #ReadDisplayAddr
         JSR     OSBYTE
-        TXA
-        LDX     XSAVE
-        STY     1,X
-        STA     0,X
+        TXA                     ; After the OSBYTE call, registers X and Y
+        LDX     XSAVE           ; contain the requested address. We replace
+        STY     1,X             ; the mode number on the data stack with 
+        STA     0,X             ; the address.
         JMP     NEXT
 
-;       DIGIT
+; -----------------------------------------------------------------------------
+;
+;       DIGIT   ( c\n1 ... n2\tf )
+;               ( c\n1 ... ff )
+;
+;       > Converts ASCII character c, with base n1, to its binary equivalent n2
+;       > and a true flag. If c is not a valid character in base n1, then only
+;       > a false flag is left.
+;
+; -----------------------------------------------------------------------------
 
 .DIGIT_NFA
         DEFWORD "DIGIT"
         EQUW    MODEADDR_NFA
 .DIGIT
-        EQUW    *+2
+{       EQUW    *+2
         SEC
-        LDA     2,X
-        SBC     #'0'
-        BMI     L8348
-        CMP     #10
-        BMI     L833B
-        SEC
-        SBC     #7
-        CMP     #10
-        BMI     L8348
-.L833B  CMP     0,X
-        BPL     L8348
-        STA     2,X
-        LDA     #1
-        PHA
-        TYA
+        LDA     2,X             ; Fetch the character from the data stack. If
+        SBC     #'0'            ; it's less than the character '0', then it
+        BMI     NoDigit         ; certainly is no digit, so bail out.
+        CMP     #10             ; If the numeric value is less than 10, check
+        BMI     CompareBase     ; it against the numberic base. If it is one of
+        SEC                     ; the seven characters in between the digits
+        SBC     #7              ; and letters, it is no digit, so bail out.
+        CMP     #10             ; Otherwise, go on to compare it against the
+        BMI     NoDigit         ; numeric base.
+.CompareBase
+        CMP     0,X             ; Check whether the value is less than the low
+        BPL     NoDigit         ; byte of the numeric base. If not, it's no
+        STA     2,X             ; digit. Otherwise replace the character with
+        LDA     #1              ; the numeric value and push a 1 flag via PUT ,
+        PHA                     ; low byte on the return stack and high byte
+        TYA                     ; via the accumulator.
         JMP     PUT
-
-.L8348  TYA
-        PHA
-        INX
-        INX
+.NoDigit
+        TYA                     ; It's not a valid digit for the numeric base,
+        PHA                     ; so push a 0 flag via PUT , low byte on the
+        INX                     ; return stack and high byte via the
+        INX                     ; accumulator.
         JMP     PUT
+}
 
 ;       (FIND)
 

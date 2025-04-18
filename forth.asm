@@ -5178,8 +5178,9 @@ ENDIF
 ;         ?TAB IF
 ;          BEGIN  ?TAB NOT  UNTIL
 ;          KEY BL = IF -1 ELSE 0 THEN
+;          AND
 ;         THEN
-;         AND
+;         0=
 ;        UNTIL
 ;        DROP
 ;       ;

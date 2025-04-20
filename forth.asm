@@ -3189,7 +3189,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8D98  DEFIMM  "DOES>"
+.DOES_NFA
+        DEFIMM  "DOES>"
         EQUW    L8D80
 .DOES   EQUW    DOCOLON
         EQUW    COMPILE
@@ -3222,7 +3223,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .ZEROGREATER_NFA
         DEFWORD "0>"
-        EQUW    L8D98
+        EQUW    DOES_NFA
 .ZEROGREATER
         EQUW    DOCOLON
         EQUW    NEGATE
@@ -3353,7 +3354,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ."
 
-.L8E8B  DEFIMM  "."""
+.DOTQ_NFA
+        DEFIMM  "."""
         EQUW    BRACKETDOTQUOTE_NFA
 .DOTQ   EQUW    DOCOLON
         EQUW    MINUSONE
@@ -3391,7 +3393,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .PEXPEC_NFA
         DEFWORD "(EXPECT)"
-        EQUW    L8E8B
+        EQUW    DOTQ_NFA
 .PEXPEC EQUW    *+2
         STX     XSAVE
         DEX                     ; Prepare a 5-byte parameter block on the stack
@@ -3483,7 +3485,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ASCII NULL
 
-.L8F33  DEFIMM  CHR$(0)
+.NULL_NFA
+        DEFIMM  CHR$(0)
         EQUW    QUERY_NFA
 .NULL   EQUW    DOCOLON
         EQUW    BLK
@@ -3528,7 +3531,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .MOVE_NFA
         DEFWORD "MOVE"
-        EQUW    L8F33
+        EQUW    NULL_NFA
 .MOVE   EQUW    DOCOLON
         EQUW    DUP
         EQUW    PLUS
@@ -3877,7 +3880,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       [COMPILE]
 
-.L91E8  DEFIMM  "[COMPILE]"
+.BCOMP_NFA
+        DEFIMM  "[COMPILE]"
         EQUW    XCREATE_NFA-REL
 .BCOMP  EQUW    DOCOLON
         EQUW    CONTEXT
@@ -3895,7 +3899,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .LITERAL_NFA
         DEFIMM  "LITERAL"
-        EQUW    L91E8
+        EQUW    BCOMP_NFA
 .LITERAL
         EQUW    DOCOLON
         EQUW    STATE
@@ -3980,7 +3984,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L9276  DEFIMM  ";"
+.SEMIS_NFA
+        DEFIMM  ";"
         EQUW    COLON_NFA
 .SEMIS  EQUW    DOCOLON
         EQUW    RSEMICOLON
@@ -3991,7 +3996,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .NUMBER_NFA
         DEFWORD "NUMBER"
-        EQUW    L9276
+        EQUW    SEMIS_NFA
 .NUMBER EQUW    DOCOLON
         EQUW    DUP
         EQUW    CFETCH
@@ -4034,7 +4039,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       (
 
-.L92E3  DEFIMM  "("
+.PAREN_NFA
+        DEFIMM  "("
         EQUW    NUMBER_NFA
 .PAREN  EQUW    DOCOLON
         EQUW    MINUSONE
@@ -4049,7 +4055,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .BRACKETNUM_NFA
         DEFWORD "(NUM)"
-        EQUW    L92E3
+        EQUW    PAREN_NFA
 .BRACKETNUM
         EQUW    DOCOLON
         EQUW    DUP
@@ -4180,7 +4186,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .QUIT_NFA
         DEFWORD "QUIT"
-        EQUW    LA03F-REL
+        EQUW    XFORT_NFA-REL
 .QUIT   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    BLK
@@ -5598,7 +5604,8 @@ ENDIF
 
 ;       ASSIGN
 
-.L99FD  DEFIMM  "ASSIGN"
+.ASSIGN_NFA
+        DEFIMM  "ASSIGN"
         EQUW    EXVEC_NFA
 .ASSIGN EQUW    DOCOLON
         EQUW    TICK
@@ -5619,7 +5626,7 @@ ENDIF
 
 .DOVEC_NFA
         DEFWORD "DOVEC"
-        EQUW    L99FD
+        EQUW    ASSIGN_NFA
 .DOVEC  EQUW    DOCOLON
         EQUW    CFA
         EQUW    SWAP
@@ -5628,7 +5635,8 @@ ENDIF
 
 ;       TO-DO
 
-.L9A1E  DEFIMM  "TO-DO"
+.TODO_NFA
+        DEFIMM  "TO-DO"
         EQUW    DOVEC_NFA
 .TODO   EQUW    DOCOLON
         EQUW    TICK
@@ -5661,7 +5669,7 @@ ENDIF
 
 .INIVEC_NFA
         DEFWORD "INITVECS"
-        EQUW    L9A1E
+        EQUW    TODO_NFA
 .INIVEC EQUW    DOCOLON
         EQUW    QUERYRSLASHW
 
@@ -5974,7 +5982,8 @@ ENDIF
 
 ;       >CLI
 
-.L9C7B  DEFIMM  ">CLI"
+.TOCLI_NFA
+        DEFIMM  ">CLI"
         EQUW    BRACKETCLI_NFA
 .TOCLI  EQUW    DOCOLON
         EQUW    STATE
@@ -5992,7 +6001,7 @@ ENDIF
 
 .OSQUOTE_NFA
         DEFIMM  "OS'"
-        EQUW    L9C7B
+        EQUW    TOCLI_NFA
         EQUW    DOCOLON
         EQUW    LIT,$27
         EQUW    STRING
@@ -6575,7 +6584,8 @@ NUM     =       XNUM-REL
 
 ;       FORTH
 
-.LA03F  DEFIMM  "FORTH"
+.XFORT_NFA
+        DEFIMM  "FORTH"
         EQUW    VOCABULARY_NFA
 .XFORT  EQUW    DOVOCABULARY
         DEFWORD " "
@@ -6802,7 +6812,8 @@ SSV     =       XSSV-REL
 
 ;       ASSEMBLER
 
-.LA16E  DEFIMM  "ASSEMBLER"
+.XASSEMBLER_NFA
+        DEFIMM  "ASSEMBLER"
         EQUW    TRIAD_NFA
 .XASSEMBLER
         EQUW    DOVOCABULARY
@@ -6830,7 +6841,7 @@ AMODE   =       XMOD-REL
 
 .EDITOR_NFA
         DEFIMM  "EDITOR"
-        EQUW    LAB39
+        EQUW    CODE_NFA
 .XEDITOR
         EQUW    DOVOCABULARY
         DEFWORD " "
@@ -6919,7 +6930,8 @@ REL_SZ = *-REL_SRC
 
 ;       -->
 
-.LA22F  DEFIMM  "-->"
+.ARROW_NFA
+        DEFIMM  "-->"
         EQUW    FLUSH_NFA
 .ARROW  EQUW    DOCOLON
         EQUW    QUERYLOADING
@@ -6940,7 +6952,7 @@ REL_SZ = *-REL_SRC
 
 .PLINE_NFA
         DEFWORD "(LINE)"
-        EQUW    LA22F
+        EQUW    ARROW_NFA
 .PLINE  EQUW    DOCOLON
         EQUW    TOR
         EQUW    CSLASHL
@@ -7272,7 +7284,7 @@ REL_SZ = *-REL_SRC
 
 .QCURR_NFA
         DEFWORD "?CURRENT"
-        EQUW    LA16E-REL
+        EQUW    XASSEMBLER_NFA-REL
 .QCURR  EQUW    DOCOLON
         EQUW    TWOPLUS
         EQUW    CURRENT
@@ -8167,7 +8179,8 @@ REL_SZ = *-REL_SRC
 
 ;       CODE
 
-.LAB39  DEFIMM  "CODE"
+.CODE_NFA
+        DEFIMM  "CODE"
         EQUW    QCURR_NFA
 .CODE   EQUW    DOCOLON
         EQUW    QUERYEXEC

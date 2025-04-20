@@ -423,16 +423,16 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.NEXT   LDY     #1              ; With IP pointing somewhere in our parameter
-.NEXTY1 LDA     (IP),Y          ; field to the CFA of the next word to execute,
-        STA     W+1             ; store that CFA at the code field pointer W .
-        DEY                     ; This turns that into an indirect JMP (CFA)
-        LDA     (IP),Y          ; to what the CFA of the next word to execute
-        STA     W               ; points to.
+.NEXT   LDY     #1              ; IP points somewhere in our parameter field to
+.NEXTY1 LDA     (IP),Y          ; a cell containing the CFA of the next word to
+        STA     W+1             ; execute. We store the CFA at the code field
+        DEY                     ; pointer W , modifying the indirect JMP (...)
+        LDA     (IP),Y          ; there to become JMP (CFA).
+        STA     W
 
-        CLC                     ; Increment IP by two so it points just beyond
-        LDA     IP              ; the CFA of the next word, to whatever follows
-        ADC     #2              ; next.
+        CLC                     ; Increment IP by two so it points to the next
+        LDA     IP              ; cell.
+        ADC     #2
         STA     IP
         BCC     CheckEscape
         INC     IP+1
@@ -445,8 +445,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
                                 ; we continue where the CFA of the next word
                                 ; points to. If that word is implemented in
                                 ; Forth, it will be DOCOLON , otherwise it will
-                                ; point to machine code, likely contained in
-                                ; that word's parameter field.
+                                ; point to the machine code in its parameter
+                                ; field.
 
 .EscapePressed
         JMP     EscapeHandler   ; Jump to the escape handler. ??? Why not

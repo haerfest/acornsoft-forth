@@ -3411,9 +3411,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         JSR     OSWORD
         LDX     XSAVE
         STY     2,X             ; Replace the addr that is on the stack by
-        LDA     #0              ; the line length, including the carriagere
-        STA     3,X             ; return if used, POP the count and continue,
-        JMP     POP             ; so only the line length remains.
+        LDA     #0              ; the line length, including the carriage
+        STA     3,X             ; return if used, then POP the count so only
+        JMP     POP             ; the line length remains.
 
 ; -----------------------------------------------------------------------------
 ;

@@ -2335,7 +2335,13 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .RZERO  EQUW    DOUSER
         EQUB    $08
 
-;       TIB
+; -----------------------------------------------------------------------------
+;
+;       TIB   ( ... addr )
+;
+;       > A user variable containing the address of the terminal input buffer.
+;
+; -----------------------------------------------------------------------------
 
 .TIB_NFA
         DEFWORD "TIB"
@@ -3373,33 +3379,64 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    DROP
         EQUW    EXIT
 
-;       (EXPECT)
+; -----------------------------------------------------------------------------
+;
+;       (EXPECT)   ( addr\count ... n )
+;
+;       Reads a line from the currently selected input stream, up to count
+;       characters, storing it at addr . Leaves the number of characters read
+;       on the stack.
+;
+; -----------------------------------------------------------------------------
 
 .PEXPEC_NFA
         DEFWORD "(EXPECT)"
         EQUW    L8E8B
 .PEXPEC EQUW    *+2
         STX     XSAVE
-        DEX
-        LDA     3,X
-        STA     0,X
-        LDA     1,X
-        STA     2,X
+        DEX                     ; Prepare a 5-byte parameter block on the stack
+        LDA     3,X             ; for the OSWORD call to read a line. With two
+        STA     0,X             ; numbers as arguments, or 4 bytes, that needs
+        LDA     1,X             ; an additional DEX to get to 5 bytes. Then
+        STA     2,X             ; shuffle things in the right order.
         LDA     4,X
         STA     1,X
-        LDA     #$20
-        STA     3,X
+        LDA     #$20            ; Accept characters from a space ($20) to the
+        STA     3,X             ; maximum character code ($FF).
         LDA     #$FF
         STA     4,X
-        LDA     #ReadLine
+        LDA     #ReadLine       ; Read a line of input.
         JSR     OSWORD
         LDX     XSAVE
-        STY     2,X
-        LDA     #0
-        STA     3,X
-        JMP     POP
+        STY     2,X             ; Replace the addr that is on the stack by
+        LDA     #0              ; the line length, including the carriagere
+        STA     3,X             ; return if used, POP the count and continue,
+        JMP     POP             ; so only the line length remains.
 
-;       EXPECT
+; -----------------------------------------------------------------------------
+;
+;       EXPECT   ( addr\count ... )
+;
+;       > Transfers characters from the keyboard to the memory starting at the
+;       > address addr until a <RETURN> (&0D) is found, or until the maximum
+;       > count of characters has been received. Backspace deletes characters
+;       > from both the display and the memory area but will not move past the
+;       > starting point at the address addr. One or more nulls are added at
+;       > the end of the text. Control characters are passed to the VDU but are
+;       > not transferred to memory at the address addr.
+;
+;       : EXPECT
+;        OVER
+;        SWAP (EXPECT)
+;        + 0 SWAP !       ( write a zero byte at the end )
+;       ;
+;
+;       Note that since one zero byte is added at the end, addr must have
+;       enough room for count + 1 bytes. Also, the OSWORD call seems to write
+;       up to one byte more than count, before it realises it has hit the
+;       limit.
+;
+; -----------------------------------------------------------------------------
 
 .EXPECT_NFA
         DEFWORD "EXPECT"
@@ -3414,7 +3451,22 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    STORE
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       QUERY
+;
+;       > Inputs up to 80 characters terminated by <RETURN> (&0D) from the
+;       > keyboard. The text is stored in the terminal input buffer whose
+;       > address is given by TIB . The value of >IN is set to zero (in
+;       > preparation for interpretation by INTERPRET ).
+;
+;       : QUERY
+;        TIB @ 80 EXPECT
+;        0 >IN
+;        !
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .QUERY_NFA
         DEFWORD "QUERY"

@@ -423,26 +423,30 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.NEXT   LDY     #1              ; With IP pointing to the CFA of the next word
-.NEXTY1 LDA     (IP),Y          ; to execute, store what CFA points to at the
-        STA     W+1             ; code field pointer W . That is part of an
-        DEY                     ; indirect JMP (...) instruction, meaning we
-        LDA     (IP),Y          ; are modifying that instruction from here.
-        STA     W
+.NEXT   LDY     #1              ; With IP pointing pointing somewhere in our
+.NEXTY1 LDA     (IP),Y          ; PFA to the CFA of the next word to execute,
+        STA     W+1             ; store that CFA at the code field pointer W .
+        DEY                     ; This turns that into an indirect JMP (CFA)
+        LDA     (IP),Y          ; to what the CFA of the next word to execute
+        STA     W               ; points to.
 
-        CLC                     ; Increment IP by two, so it points to the PFA
-        LDA     IP              ; of this word. If the word is a colon
-        ADC     #2              ; definition, the Parameter Field will contain
-        STA     IP              ; the addresses of the CFA's of each word that
-        BCC     CheckEscape     ; was compiled in and needs to be executed.
+        CLC                     ; Increment IP by two so its points just
+        LDA     IP              ; beyond the CFA of the next word, to whatever
+        ADC     #2              ; follows next.
+        STA     IP
+        BCC     CheckEscape
         INC     IP+1
 
 .CheckEscape
         BIT     EscapeFlag      ; Like with BBC Basic, execution can be stopped
         BMI     EscapePressed   ; by pressing the escape key.
 
-        JMP     W-1             ; Perform a (modified) indirect jump JMP (...)
-                                ; to what the CFA of this word points to.
+        JMP     W-1             ; W-1 now contains an indirect JMP (CFA), so
+                                ; we continue where the CFA of the next word
+                                ; points at. If that word is implemented in
+                                ; Forth, it will be DOCOLON , otherwise it will
+                                ; point to machine code, likely contained in
+                                ; that word's parameter field.
 
 .EscapePressed
         JMP     EscapeHandler   ; Jump to the escape handler. ??? Why not

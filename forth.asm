@@ -3400,9 +3400,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDA     3,X             ; for the OSWORD call to read a line. With two
         STA     0,X             ; numbers as arguments, or 4 bytes, that needs
         LDA     1,X             ; an additional DEX to get to 5 bytes. Then
-        STA     2,X             ; shuffle things in the right order.
-        LDA     4,X
-        STA     1,X
+        STA     2,X             ; shuffle things in the right order. Since the
+        LDA     4,X             ; data stack (X) is in zero page, and Y is
+        STA     1,X             ; zero, YX is set correctly for the call.
         LDA     #$20            ; Accept characters from a space ($20) to the
         STA     3,X             ; maximum character code ($FF).
         LDA     #$FF

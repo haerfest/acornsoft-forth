@@ -834,7 +834,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         JSR     OSBYTE
         TXA                     ; After the OSBYTE call, registers X and Y
         LDX     XSAVE           ; contain the requested address. We replace
-        STY     1,X             ; the mode number on the data stack with 
+        STY     1,X             ; the mode number on the data stack with
         STA     0,X             ; the address.
         JMP     NEXT
 
@@ -1025,7 +1025,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       > and execute NEXT .
 ;
 ; -----------------------------------------------------------------------------
- 
+
 .PUSH0A PHA
         LDA     #0
         JMP     PUSH
@@ -1060,7 +1060,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8445  DEFWORD "SP!"
+.SPSTORE_NFA
+        DEFWORD "SP!"
         EQUW    RPFETCH_NFA
 .SPSTORE
         EQUW    *+2
@@ -1079,11 +1080,11 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .RPSTORE_NFA
         DEFWORD "RP!"
-        EQUW    L8445
+        EQUW    SPSTORE_NFA
 .RPSTORE
         EQUW    *+2
         STX     XSAVE
-        LDY     #8              ; Transfer the low byte of the R0 user variable  
+        LDY     #8              ; Transfer the low byte of the R0 user variable
         LDA     (UP),Y          ; to the hardware stack register SP, which
         TAX                     ; always resides in page one at $01xx.
         TXS
@@ -1126,8 +1127,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L848E  DEFWORD ">VDU"
-        EQUW    L9FFB-REL
+.TOVDU_NFA
+        DEFWORD ">VDU"
+        EQUW    XEMIT_NFA-REL
 .TOVDU  EQUW    *+2
         LDA     0,X
         JSR     OSWRCH
@@ -1146,8 +1148,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 
-.L849F  DEFWORD "CMOVE"
-        EQUW    L848E
+.CMOVE_NFA
+        DEFWORD "CMOVE"
+        EQUW    TOVDU_NFA
 .CMOVE  EQUW    *+2
         SEC
         TYA
@@ -1183,8 +1186,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L84D5  DEFWORD "U*"
-        EQUW    L849F
+.USTAR_NFA
+        DEFWORD "U*"
+        EQUW    CMOVE_NFA
 .USTAR  EQUW    *+2
         LDA     0,X
         STA     N
@@ -1224,8 +1228,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8508  DEFWORD "U/"
-        EQUW    L84D5
+.USLASH_NFA
+        DEFWORD "U/"
+        EQUW    USTAR_NFA
 .USLASH EQUW    *+2
         STY     N+1
         LDA     4,X
@@ -1264,8 +1269,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       AND
 
-.L854E  DEFWORD "AND"
-        EQUW    L8508
+.AND_NFA
+        DEFWORD "AND"
+        EQUW    USLASH_NFA
 .AND    EQUW    *+2
         LDA     0,X
         AND     2,X
@@ -1278,8 +1284,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       OR
 
-.L8564  DEFWORD "OR"
-        EQUW    L854E
+.OR_NFA DEFWORD "OR"
+        EQUW    AND_NFA
 .OR     EQUW    *+2
         LDA     0,X
         ORA     2,X
@@ -1294,7 +1300,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .XOR_NFA
         DEFWORD "XOR"
-        EQUW    L8564
+        EQUW    OR_NFA
 .XOR    EQUW    *+2
         LDA     0,X
         EOR     2,X
@@ -1349,27 +1355,27 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         LDX     #1                      ; input buffer
         LDA     #FlushBufferClass
         JSR     OSBYTE
-        
+
         LDX     XSAVE
         LDY     1,X
         LDA     0,X
         TAX
         LDA     #ReadKeyWithTimeLimit
         JSR     OSBYTE
-        
+
         TXA
         PHA
         TYA
         PHA
-        
+
         LDX     N                       ; restore previous value
         LDA     #SetKeyboardRepeatPeriod
         JSR     OSBYTE
-        
+
         LDX     N+1                     ; restore previous value
         LDA     #SetKeyboardRepeatDelay
         JSR     OSBYTE
-        
+
         PLA
         LDX     XSAVE
         JMP     PUT
@@ -1382,7 +1388,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L85D7  DEFWORD "(KEY)"
+.BRACKETKEY_NFA
+        DEFWORD "(KEY)"
         EQUW    QUERYKEY_NFA
 .BRACKETKEY
         EQUW    *+2
@@ -1399,7 +1406,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L85E7  DEFWORD "EXIT"
+.EXIT_NFA
+        DEFWORD "EXIT"
         EQUW    KEY_NFA-REL
 .EXIT   EQUW    *+2
         PLA                     ; Pop the previous value of IP, pointing in the
@@ -1419,7 +1427,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .RFETCH_NFA
         DEFWORD "R@"
-        EQUW    L85E7
+        EQUW    EXIT_NFA
 .RFETCH EQUW    *+2
         STX     XSAVE
         TSX
@@ -1484,7 +1492,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       0=
 
-.L8661  DEFWORD "0="
+.ZEROEQUAL_NFA
+        DEFWORD "0="
         EQUW    L8643
 .ZEROEQUAL
         EQUW    *+2
@@ -1498,8 +1507,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       0<
 
-.L8676  DEFWORD "0<"
-        EQUW    L8661
+.ZEROLESS_NFA
+        DEFWORD "0<"
+        EQUW    ZEROEQUAL_NFA
 .ZEROLESS
         EQUW    *+2
         ASL     1,X
@@ -1511,8 +1521,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       <
 
-.L8688  DEFWORD "<"
-        EQUW    L8676
+.LESS_NFA
+        DEFWORD "<"
+        EQUW    ZEROLESS_NFA
 .LESS   EQUW    *+2
         SEC
         LDA     2,X
@@ -1529,8 +1540,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       D<
 
-.L86A5  DEFWORD "D<"
-        EQUW    L8688
+.DLESS_NFA
+        DEFWORD "D<"
+        EQUW    LESS_NFA
 .DLESS  EQUW    *+2
         SEC
         LDA     6,X
@@ -1555,8 +1567,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       +
 
-.L86CF  DEFWORD "+"
-        EQUW    L86A5
+.PLUS_NFA
+        DEFWORD "+"
+        EQUW    DLESS_NFA
 .PLUS   EQUW    *+2
         CLC
         LDA     0,X
@@ -1569,8 +1582,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       D+
 
-.L86E5  DEFWORD "D+"
-        EQUW    L86CF
+.DPLUS_NFA
+        DEFWORD "D+"
+        EQUW    PLUS_NFA
 .DPLUS  EQUW    *+2
         CLC
         LDA     2,X
@@ -1589,8 +1603,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       NEGATE
 
-.L8708  DEFWORD "NEGATE"
-        EQUW    L86E5
+.NEGATE_NFA
+        DEFWORD "NEGATE"
+        EQUW    DPLUS_NFA
 .NEGATE EQUW    *+2
         SEC
 .L8714  TYA
@@ -1603,8 +1618,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       DNEGATE
 
-.L8721  DEFWORD "DNEGATE"
-        EQUW    L8708
+.DNEGATE_NFA
+        DEFWORD "DNEGATE"
+        EQUW    NEGATE_NFA
 .DNEGATE
         EQUW    *+2
         SEC
@@ -1618,21 +1634,24 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       DROP
 
-.L873B  DEFWORD "DROP"
-        EQUW    L8721
+.DROP_NFA
+        DEFWORD "DROP"
+        EQUW    DNEGATE_NFA
 .DROP   EQUW    POP
 
 ;       2DROP
 
-.L8744  DEFWORD "2DROP"
-        EQUW    L873B
+.TWODROP_NFA
+        DEFWORD "2DROP"
+        EQUW    DROP_NFA
 .TWODROP
         EQUW    POPTWO
 
 ;       DUP
 
-.L874E  DEFWORD "DUP"
-        EQUW    L8744
+.DUP_NFA
+        DEFWORD "DUP"
+        EQUW    TWODROP_NFA
 .DUP    EQUW    *+2
         LDA     0,X
         PHA
@@ -1643,7 +1662,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .QUERYDUP_NFA
         DEFWORD "?DUP"
-        EQUW    L874E
+        EQUW    DUP_NFA
 .QUERYDUP
         EQUW    *+2
         LDA     0,X
@@ -1781,7 +1800,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       PAGE
 
-.L8843  DEFWORD "PAGE"
+.PAGE_NFA
+        DEFWORD "PAGE"
         EQUW    TRAVERSE_NFA
 .PAGE   EQUW    *+2
         STX     XSAVE
@@ -1795,8 +1815,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       HIMEM
 
-.L885B  DEFWORD "HIMEM"
-        EQUW    L8843
+.HIMEM_NFA
+        DEFWORD "HIMEM"
+        EQUW    PAGE_NFA
 .HIMEM  EQUW    *+2
         STX     XSAVE
         LDA     #ReadHimem
@@ -1817,7 +1838,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .QUERYFILE_NFA
         DEFWORD "?FILE"
-        EQUW    L885B
+        EQUW    HIMEM_NFA
 .QUERYFILE
         EQUW    *+2
         TYA                     ; With A and Y cleared, OSARGS will rturn the
@@ -1836,7 +1857,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         DEFWORD "C@"
         EQUW    QUERYFILE_NFA
 .CFETCH EQUW    *+2
-        LDA     (0,X)           ; Fetch the low byte that the address on top of 
+        LDA     (0,X)           ; Fetch the low byte that the address on top of
         STA     0,X             ; the data stack points to.  Replace the
         STY     1,X             ; address by the byte we just read, and set the
         JMP     NEXT            ; high byte to zero via Y.
@@ -2109,7 +2130,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;        CONSTANT
 ;        (;CODE) ... machine code here ...
 ;       ;
-;       
+;
 ; -----------------------------------------------------------------------------
 
 .USER_NFA
@@ -2244,7 +2265,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .BSLASHBUF_NFA
         DEFWORD "B/BUF"
-        EQUW    LA01C-REL
+        EQUW    XLIMI_NFA-REL
 .BSLASHBUF
         EQUW    DOCONSTANT
         EQUW    BLKSIZ
@@ -2394,15 +2415,17 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       BLK
 
-.L8A5E  DEFWORD "BLK"
+.BLK_NFA
+        DEFWORD "BLK"
         EQUW    VOCLINK_NFA
 .BLK    EQUW    DOUSER
         EQUB    $16
 
 ;       >IN
 
-.L8A67  DEFWORD ">IN"
-        EQUW    L8A5E
+.TOIN_NFA
+        DEFWORD ">IN"
+        EQUW    BLK_NFA
 .TOIN
         EQUW    DOUSER
         EQUB    $18
@@ -2418,37 +2441,42 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8A70  DEFWORD "OUT"
-        EQUW    L8A67
+.OUT_NFA
+        DEFWORD "OUT"
+        EQUW    TOIN_NFA
 .OUT    EQUW    DOUSER
         EQUB    $1A
 
 ;       SCR
 
-.L8A79  DEFWORD "SCR"
-        EQUW    L8A70
+.SCR_NFA
+        DEFWORD "SCR"
+        EQUW    OUT_NFA
 .SCR    EQUW    DOUSER
         EQUB    $1C
 
 ;       OFFSET
 
-.L8A82  DEFWORD "OFFSET"
-        EQUW    L8A79
+.OFFSET_NFA
+        DEFWORD "OFFSET"
+        EQUW    SCR_NFA
 .OFFSET EQUW    DOUSER
         EQUB    $1E
 
 ;       CONTEXT
 
-.L8A8E  DEFWORD "CONTEXT"
-        EQUW    L8A82
+.CONTEXT_NFA
+        DEFWORD "CONTEXT"
+        EQUW    OFFSET_NFA
 .CONTEXT
         EQUW    DOUSER
         EQUB    $20
 
 ;       CURRENT
 
-.L8A9B  DEFWORD "CURRENT"
-        EQUW    L8A8E
+.CURRENT_NFA
+        DEFWORD "CURRENT"
+        EQUW    CONTEXT_NFA
 .CURRENT
         EQUW    DOUSER
         EQUB    $22
@@ -2464,21 +2492,23 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .STATE_NFA
         DEFWORD "STATE"
-        EQUW    L8A9B
+        EQUW    CURRENT_NFA
 .STATE  EQUW    DOUSER
         EQUB    $24
 
 ;       BASE
 
-.L8AB3  DEFWORD "BASE"
+.BASE_NFA
+        DEFWORD "BASE"
         EQUW    STATE_NFA
 .BASE   EQUW    DOUSER
         EQUB    $26
 
 ;       DPL
 
-.L8ABD  DEFWORD "DPL"
-        EQUW    L8AB3
+.DPL_NFA
+        DEFWORD "DPL"
+        EQUW    BASE_NFA
 .DPL    EQUW    DOUSER
         EQUB    $28
 
@@ -2493,28 +2523,31 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .CSP_NFA
         DEFWORD "CSP"
-        EQUW    L8ABD
+        EQUW    DPL_NFA
 .CSP    EQUW    DOUSER
         EQUB    $2C
 
 ;       R#
 
-.L8ACF  DEFWORD "R#"
+.RSHARP_NFA
+        DEFWORD "R#"
         EQUW    CSP_NFA
 .RSHARP EQUW    DOUSER
         EQUB    $2E
 
 ;       HLD
 
-.L8AD7  DEFWORD "HLD"
-        EQUW    L8ACF
+.HLD_NFA
+        DEFWORD "HLD"
+        EQUW    RSHARP_NFA
 .HLD    EQUW    DOUSER
         EQUB    $30
 
 ;       1+
 
-.L8AE0  DEFWORD "1+"
-        EQUW    L8AD7
+.ONEPLUS_NFA
+        DEFWORD "1+"
+        EQUW    HLD_NFA
 .ONEPLUS
         EQUW    DOCOLON
         EQUW    ONE
@@ -2523,8 +2556,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       2+
 
-.L8AED  DEFWORD "2+"
-        EQUW    L8AE0
+.TWOPLUS_NFA
+        DEFWORD "2+"
+        EQUW    ONEPLUS_NFA
 .TWOPLUS
         EQUW    DOCOLON
         EQUW    TWO
@@ -2535,8 +2569,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       1-
 
-.L8AFB  DEFWORD "1-"
-        EQUW    L8AED
+.ONEMINUS_NFA
+        DEFWORD "1-"
+        EQUW    TWOPLUS_NFA
 .ONEMINUS
         EQUW    DOCOLON
         EQUW    MINUSONE
@@ -2545,8 +2580,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       2-
 
-.L8B08  DEFWORD "2-"
-        EQUW    L8AFB
+.TWOMINUS_NFA
+        DEFWORD "2-"
+        EQUW    ONEMINUS_NFA
 .TWOMINUS
         EQUW    DOCOLON
         EQUW    MINUSTWO
@@ -2568,7 +2604,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .HERE_NFA
         DEFWORD "HERE"
-        EQUW    L8B08
+        EQUW    TWOMINUS_NFA
 .HERE   EQUW    DOCOLON
         EQUW    DP
         EQUW    FETCH
@@ -2599,7 +2635,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       SPACE
 
-.L8B34  DEFWORD "SPACE"
+.SPACE_NFA
+        DEFWORD "SPACE"
         EQUW    ALLOT_NFA
 .SPACE  EQUW    DOCOLON
         EQUW    BL
@@ -2608,8 +2645,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ,
 
-.L8B44  DEFWORD ","
-        EQUW    L8B34
+.COMMA_NFA
+        DEFWORD ","
+        EQUW    SPACE_NFA
 .COMMA  EQUW    DOCOLON
         EQUW    HERE
         EQUW    STORE
@@ -2619,8 +2657,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       C,
 
-.L8B54  DEFWORD "C,"
-        EQUW    L8B44
+.CCOMMA_NFA
+        DEFWORD "C,"
+        EQUW    COMMA_NFA
 .CCOMMA
         EQUW    DOCOLON
         EQUW    HERE
@@ -2631,8 +2670,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       LAST
 
-.L8B65  DEFWORD "LAST"
-        EQUW    L8B54
+.LAST_NFA
+        DEFWORD "LAST"
+        EQUW    CCOMMA_NFA
 .LAST   EQUW    DOCOLON
         EQUW    CURRENT
         EQUW    FETCH
@@ -2641,8 +2681,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       SMUDGE
 
-.L8B76  DEFWORD "SMUDGE"
-        EQUW    L8B65
+.SMUDG_NFA
+        DEFWORD "SMUDGE"
+        EQUW    LAST_NFA
 .SMUDG  EQUW    DOCOLON
         EQUW    LAST
         EQUW    LIT,$20
@@ -2651,8 +2692,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       -
 
-.L8B8B  DEFWORD "-"
-        EQUW    L8B76
+.MINUS_NFA
+        DEFWORD "-"
+        EQUW    SMUDG_NFA
 .MINUS
         EQUW    DOCOLON
         EQUW    NEGATE
@@ -2661,8 +2703,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       =
 
-.L8B97  DEFWORD "="
-        EQUW    L8B8B
+.EQUAL_NFA
+        DEFWORD "="
+        EQUW    MINUS_NFA
 .EQUAL  EQUW    DOCOLON
         EQUW    MINUS
         EQUW    ZEROEQUAL
@@ -2670,8 +2713,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       >
 
-.L8BA3  DEFWORD ">"
-        EQUW    L8B97
+.GREATERTHAN_NFA
+        DEFWORD ">"
+        EQUW    EQUAL_NFA
 .GREATERTHAN
         EQUW    DOCOLON
         EQUW    SWAP
@@ -2680,8 +2724,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       U<
 
-.L8BAF  DEFWORD "U<"
-        EQUW    L8BA3
+.ULESS_NFA
+        DEFWORD "U<"
+        EQUW    GREATERTHAN_NFA
 .ULESS  EQUW    DOCOLON
         EQUW    ZERO
         EQUW    SWAP
@@ -2691,8 +2736,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       LFA
 
-.L8BC0  DEFWORD "LFA"
-        EQUW    L8BAF
+.LFA_NFA
+        DEFWORD "LFA"
+        EQUW    ULESS_NFA
 .LFA    EQUW    DOCOLON
         EQUW    LIT,4
         EQUW    MINUS
@@ -2700,8 +2746,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       NFA
 
-.L8BD0  DEFWORD "NFA"
-        EQUW    L8BC0
+.NFA_NFA
+        DEFWORD "NFA"
+        EQUW    LFA_NFA
 .NFA    EQUW    DOCOLON
         EQUW    LIT,5
         EQUW    MINUS
@@ -2711,16 +2758,18 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       CFA
 
-.L8BE4  DEFWORD "CFA"
-        EQUW    L8BD0
+.CFA_NFA
+        DEFWORD "CFA"
+        EQUW    NFA_NFA
 .CFA    EQUW    DOCOLON
         EQUW    TWOMINUS
         EQUW    EXIT
 
 ;       PFA
 
-.L8BF0  DEFWORD "PFA"
-        EQUW    L8BE4
+.PFA_NFA
+        DEFWORD "PFA"
+        EQUW    CFA_NFA
 .PFA    EQUW    DOCOLON
         EQUW    ONE
         EQUW    TRAVERSE
@@ -2732,7 +2781,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .NOT_NFA
         DEFWORD "NOT"
-        EQUW    L8BF0
+        EQUW    PFA_NFA
 .NOT    EQUW    DOCOLON
         EQUW    ZEROEQUAL
         EQUW    EXIT
@@ -2748,7 +2797,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8C10  DEFWORD "!CSP"
+.STORECSP_NFA
+        DEFWORD "!CSP"
         EQUW    NOT_NFA
 .STORECSP
         EQUW    DOCOLON
@@ -2761,7 +2811,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .QUERYERROR_NFA
         DEFWORD "?ERROR"
-        EQUW    L8C10
+        EQUW    STORECSP_NFA
 .QUERYERROR
         EQUW    DOCOLON
         EQUW    SWAP
@@ -2797,7 +2847,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ?EXEC
 
-.L8C54  DEFWORD "?EXEC"
+.QUERYEXEC_NFA
+        DEFWORD "?EXEC"
         EQUW    QUERYCOMP_NFA
 .QUERYEXEC
         EQUW    DOCOLON
@@ -2826,7 +2877,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .QUERYPAIRS_NFA
         DEFWORD "?PAIRS"
-        EQUW    L8C54
+        EQUW    QUERYEXEC_NFA
 .QUERYPAIRS
         EQUW    DOCOLON
         EQUW    MINUS
@@ -2864,7 +2915,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ?LOADING
 
-.L8C98  DEFWORD "?LOADING"
+.QUERYLOADING_NFA
+        DEFWORD "?LOADING"
         EQUW    QUERYCSP_NFA
 .QUERYLOADING
         EQUW    DOCOLON
@@ -2879,7 +2931,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .IMMEDIATE_NFA
         DEFWORD "IMMEDIATE"
-        EQUW    L8C98
+        EQUW    QUERYLOADING_NFA
 .IMMEDIATE
         EQUW    DOCOLON
         EQUW    LAST
@@ -3012,7 +3064,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       HEX
 
-.L8D25  DEFWORD "HEX"
+.HEX_NFA
+        DEFWORD "HEX"
         EQUW    QTAB_NFA
 .HEX    EQUW    DOCOLON
         EQUW    LIT,16
@@ -3022,8 +3075,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       DECIMAL
 
-.L8D37  DEFWORD "DECIMAL"
-        EQUW    L8D25
+.DECIM_NFA
+        DEFWORD "DECIMAL"
+        EQUW    HEX_NFA
 .DECIM  EQUW    DOCOLON
         EQUW    LIT,10
         EQUW    BASE
@@ -3032,8 +3086,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       CR
 
-.L8D4D  DEFWORD "CR"
-        EQUW    L8D37
+.CR_NFA DEFWORD "CR"
+        EQUW    DECIM_NFA
 .CR     EQUW    DOCOLON
         EQUW    LIT,LineFeed
         EQUW    EMIT
@@ -3057,8 +3111,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8D68  DEFWORD "(;CODE)"
-        EQUW    L8D4D
+.BRACKETSEMICOLONCODE_NFA
+        DEFWORD "(;CODE)"
+        EQUW    CR_NFA
 .BRACKETSEMICOLONCODE
         EQUW    DOCOLON
         EQUW    RFROM
@@ -3096,7 +3151,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ; -----------------------------------------------------------------------------
 
 .L8D80  DEFIMM  ";CODE"
-        EQUW    L8D68
+        EQUW    BRACKETSEMICOLONCODE_NFA
 .L8D88  EQUW    DOCOLON
         EQUW    QUERYCSP
         EQUW    COMPILE
@@ -3107,7 +3162,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    EXIT
 
 ; -----------------------------------------------------------------------------
-;        
+;
 ;       DOES>
 ;
 ;       > Used with CREATE in the form:
@@ -3155,7 +3210,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       0>
 
-.L8DCE  DEFWORD "0>"
+.ZEROGREATER_NFA
+        DEFWORD "0>"
         EQUW    L8D98
 .ZEROGREATER
         EQUW    DOCOLON
@@ -3180,7 +3236,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .COUNT_NFA
         DEFWORD "COUNT"
-        EQUW    L8DCE
+        EQUW    ZEROGREATER_NFA
 .COUNT  EQUW    DOCOLON
         EQUW    DUP
         EQUW    ONEPLUS
@@ -3228,7 +3284,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       -TRAILING
 
-.L8E1A  DEFWORD "-TRAILING"
+.DTRAI_NFA
+        DEFWORD "-TRAILING"
         EQUW    TYPE_NFA
 .DTRAI  EQUW    DOCOLON
         EQUW    DUP
@@ -3253,8 +3310,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       TEXT,
 
-.L8E56  DEFWORD "TEXT,"
-        EQUW    L8E1A
+.TEXTCOMMA_NFA
+        DEFWORD "TEXT,"
+        EQUW    DTRAI_NFA
 .TEXTCOMMA
         EQUW    DOCOLON
         EQUW    DUP
@@ -3268,8 +3326,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       (.")
 
-.L8E70  DEFWORD "(."")"
-        EQUW    L8E56
+.BRACKETDOTQUOTE_NFA
+        DEFWORD "(."")"
+        EQUW    TEXTCOMMA_NFA
 .BRACKETDOTQUOTE
         EQUW    DOCOLON
         EQUW    RFETCH
@@ -3285,7 +3344,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       ."
 
 .L8E8B  DEFIMM  "."""
-        EQUW    L8E70
+        EQUW    BRACKETDOTQUOTE_NFA
 .DOTQ   EQUW    DOCOLON
         EQUW    MINUSONE
         EQUW    TOIN
@@ -3312,7 +3371,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       (EXPECT)
 
-.L8EC8  DEFWORD "(EXPECT)"
+.PEXPEC_NFA
+        DEFWORD "(EXPECT)"
         EQUW    L8E8B
 .PEXPEC EQUW    *+2
         STX     XSAVE
@@ -3337,8 +3397,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       EXPECT
 
-.L8EFC  DEFWORD "EXPECT"
-        EQUW    L8EC8
+.EXPECT_NFA
+        DEFWORD "EXPECT"
+        EQUW    PEXPEC_NFA
 .EXPECT EQUW    DOCOLON
         EQUW    OVER
         EQUW    SWAP
@@ -3351,8 +3412,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       QUERY
 
-.L8F17  DEFWORD "QUERY"
-        EQUW    L8EFC
+.QUERY_NFA
+        DEFWORD "QUERY"
+        EQUW    EXPECT_NFA
 .QUERY  EQUW    DOCOLON
         EQUW    TIB
         EQUW    FETCH
@@ -3366,7 +3428,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       ASCII NULL
 
 .L8F33  DEFIMM  CHR$(0)
-        EQUW    L8F17
+        EQUW    QUERY_NFA
 .NULL   EQUW    DOCOLON
         EQUW    BLK
         EQUW    FETCH
@@ -3408,7 +3470,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L8F6D  DEFWORD "MOVE"
+.MOVE_NFA
+        DEFWORD "MOVE"
         EQUW    L8F33
 .MOVE   EQUW    DOCOLON
         EQUW    DUP
@@ -3418,8 +3481,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       FILL
 
-.L8F7E  DEFWORD "FILL"
-        EQUW    L8F6D
+.FILL_NFA
+        DEFWORD "FILL"
+        EQUW    MOVE_NFA
 .FILL   EQUW    DOCOLON
         EQUW    OVER
         EQUW    ONE
@@ -3441,8 +3505,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ERASE
 
-.L8FAD  DEFWORD "ERASE"
-        EQUW    L8F7E
+.ERASE_NFA
+        DEFWORD "ERASE"
+        EQUW    FILL_NFA
 .ERASE  EQUW    DOCOLON
         EQUW    ZERO
         EQUW    FILL
@@ -3450,8 +3515,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       BLANKS
 
-.L8FBD  DEFWORD "BLANKS"
-        EQUW    L8FAD
+.BLANKS_NFA
+        DEFWORD "BLANKS"
+        EQUW    ERASE_NFA
 .BLANKS EQUW    DOCOLON
         EQUW    BL
         EQUW    FILL
@@ -3459,8 +3525,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       HOLD
 
-.L8FCE  DEFWORD "HOLD"
-        EQUW    L8FBD
+.HOLD_NFA
+        DEFWORD "HOLD"
+        EQUW    BLANKS_NFA
 .HOLD   EQUW    DOCOLON
         EQUW    MINUSONE
         EQUW    HLD
@@ -3472,8 +3539,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       (WORD)  ( C -- ADR LEN )
 
-.L8FE5  DEFWORD "(WORD)"
-        EQUW    L8FCE
+.PWORD_NFA
+        DEFWORD "(WORD)"
+        EQUW    HOLD_NFA
 .PWORD  EQUW    DOCOLON
         EQUW    BLK
         EQUW    FETCH
@@ -3500,22 +3568,25 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       WDSZ
 
-.L9020  DEFWORD "WDSZ"
-        EQUW    L8FE5
+.WDSZ_NFA
+        DEFWORD "WDSZ"
+        EQUW    PWORD_NFA
 .WDSZ   EQUW    DOCONSTANT
         EQUW    WBSIZ           ; WORD BUFFER SIZE
 
 ;       WBFR
 
-.L902B  DEFWORD "WBFR"
-        EQUW    L9020
+.WBFR_NFA
+        DEFWORD "WBFR"
+        EQUW    WDSZ_NFA
 .WBFR   EQUW    DOCONSTANT
         EQUW    WORDBU          ; WORD BUFFER ADDR
 
 ;       1WORD
 
-.L9036  DEFWORD "1WORD"
-        EQUW    L902B
+.ONEWRD_NFA
+        DEFWORD "1WORD"
+        EQUW    WBFR_NFA
 .ONEWRD EQUW    DOCOLON
         EQUW    PWORD
         EQUW    WDSZ
@@ -3531,8 +3602,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       WORD
 
-.L9056  DEFWORD "WORD"
-        EQUW    L9036
+.WORD_NFA
+        DEFWORD "WORD"
+        EQUW    ONEWRD_NFA
 .WORD   EQUW    DOCOLON
         EQUW    ONEWRD
         EQUW    DUP
@@ -3547,8 +3619,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       CONVERT
 
-.L9075  DEFWORD "CONVERT"
-        EQUW    L9056
+.CONV_NFA
+        DEFWORD "CONVERT"
+        EQUW    WORD_NFA
 .CONV   EQUW    DOCOLON
         EQUW    ONEPLUS
         EQUW    DUP
@@ -3575,8 +3648,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       -FIND
 
-.L90B1  DEFWORD "-FIND"
-        EQUW    L9075
+.DFIND_NFA
+        DEFWORD "-FIND"
+        EQUW    CONV_NFA
 .DFIND  EQUW    DOCOLON
         EQUW    BL
         EQUW    ONEWRD
@@ -3586,8 +3660,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       FIND
 
-.L90C5  DEFWORD "FIND"
-        EQUW    L90B1
+.FIND_NFA
+        DEFWORD "FIND"
+        EQUW    DFIND_NFA
 .FIND   EQUW    DOCOLON
         EQUW    CONTEXT
         EQUW    FETCH
@@ -3601,8 +3676,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       ERROR
 
-.L90E4  DEFWORD "ERROR"
-        EQUW    L90C5
+.ERROR_NFA
+        DEFWORD "ERROR"
+        EQUW    FIND_NFA
 .ERROR  EQUW    DOCOLON
         EQUW    WARNING
         EQUW    FETCH
@@ -3643,8 +3719,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L911D  DEFWORD "ID."
-        EQUW    L90E4
+.IDDOT_NFA
+        DEFWORD "ID."
+        EQUW    ERROR_NFA
 .IDDOT  EQUW    DOCOLON
         EQUW    PAD
         EQUW    BL
@@ -3674,8 +3751,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L914F  DEFWORD "(CREATE)"
-        EQUW    L911D
+.BRACKETCREATE_NFA
+        DEFWORD "(CREATE)"
+        EQUW    IDDOT_NFA
 .BRACKETCREATE
         EQUW    DOCOLON
         EQUW    FIRST
@@ -3744,7 +3822,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       [COMPILE]
 
 .L91E8  DEFIMM  "[COMPILE]"
-        EQUW    LA028-REL
+        EQUW    XCREATE_NFA-REL
 .BCOMP  EQUW    DOCOLON
         EQUW    CONTEXT
         EQUW    FETCH
@@ -3855,7 +3933,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       NUMBER
 
-.L9282  DEFWORD "NUMBER"
+.NUMBER_NFA
+        DEFWORD "NUMBER"
         EQUW    L9276
 .NUMBER EQUW    DOCOLON
         EQUW    DUP
@@ -3900,7 +3979,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;       (
 
 .L92E3  DEFIMM  "("
-        EQUW    L9282
+        EQUW    NUMBER_NFA
 .PAREN  EQUW    DOCOLON
         EQUW    MINUSONE
         EQUW    TOIN
@@ -3912,7 +3991,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       (NUM)
 
-.L92F9  DEFWORD "(NUM)"
+.BRACKETNUM_NFA
+        DEFWORD "(NUM)"
         EQUW    L92E3
 .BRACKETNUM
         EQUW    DOCOLON
@@ -3935,8 +4015,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ;       INTERPRET
 
-.L9329  DEFWORD "INTERPRET"
-        EQUW    LA035-REL
+.INTERPRET_NFA
+        DEFWORD "INTERPRET"
+        EQUW    XNUM_NFA-REL
 .INTERPRET
         EQUW    DOCOLON
 
@@ -3993,7 +4074,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .VOCABULARY_NFA
         DEFWORD "VOCABULARY"
-        EQUW    L9329
+        EQUW    INTERPRET_NFA
 .VOCABULARY
         EQUW    DOCOLON
         EQUW    CREATE
@@ -4041,7 +4122,8 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L939D  DEFWORD "QUIT"
+.QUIT_NFA
+        DEFWORD "QUIT"
         EQUW    LA03F-REL
 .QUIT   EQUW    DOCOLON
         EQUW    ZERO
@@ -4079,12 +4161,11 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 
-.L93CB  DEFWORD "DEFINITIONS"
-        EQUW    L939D
-
+.DEFINITIONS_NFA
+        DEFWORD "DEFINITIONS"
+        EQUW    QUIT_NFA
 .DEFINITIONS
         EQUW    DOCOLON
-
         EQUW    CONTEXT
         EQUW    FETCH
         EQUW    CURRENT
@@ -4111,8 +4192,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L93E5  DEFWORD "(WARM)"
-        EQUW    L93CB
+.PWARM_NFA
+        DEFWORD "(WARM)"
+        EQUW    DEFINITIONS_NFA
 .PWARM  EQUW    DOCOLON
         EQUW    SPSTORE
         EQUW    CR
@@ -4139,8 +4221,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L9403  DEFWORD "(ABORT)"
-        EQUW    L93E5
+.BRACKETABORT_NFA
+        DEFWORD "(ABORT)"
+        EQUW    PWARM_NFA
 .BRACKETABORT
         EQUW    DOCOLON
         EQUW    SPSTORE
@@ -4166,8 +4249,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L9421  DEFWORD "ESCAPE"
-        EQUW    LA04F-REL
+.ESCAPE_NFA
+        DEFWORD "ESCAPE"
+        EQUW    XABORT_NFA-REL
 .ESCAPE
         EQUW    DOCOLON
         EQUW    SPSTORE
@@ -4204,8 +4288,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.L943D  DEFWORD "OSERROR"
-        EQUW    L9421
+.OSERR_NFA
+        DEFWORD "OSERROR"
+        EQUW    ESCAPE_NFA
 .OSERR  EQUW    DOCOLON
         EQUW    SPSTORE
         EQUW    CR
@@ -4249,7 +4334,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .MODE_NFA
         DEFWORD "MODE"
-        EQUW    L943D
+        EQUW    OSERR_NFA
 .MODE   EQUW    DOCOLON
         EQUW    HIADDR
         EQUW    MINUSONE
@@ -4339,7 +4424,7 @@ ENDIF
         LDA     #ClearEscapeCondition   ; Tell the OS the escape press has been
         JSR     OSBYTE                  ; dealt with.
 
-        LDA     PtrToEscapePFA+1        ; Set IP to point to the PFA of the 
+        LDA     PtrToEscapePFA+1        ; Set IP to point to the PFA of the
         STA     IP+1                    ; ESCAPE word, so that will be executed
         LDA     PtrToEscapePFA          ; next.
         STA     IP
@@ -4406,7 +4491,8 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9534  DEFWORD "WARM"
+.WARM_NFA
+        DEFWORD "WARM"
         EQUW    COLD_NFA
 .WARM   EQUW    *+2
 
@@ -4425,8 +4511,9 @@ ENDIF
 
 ;       S->D
 
-.L9558  DEFWORD "S->D"
-        EQUW    L9534
+.STOD_NFA
+        DEFWORD "S->D"
+        EQUW    WARM_NFA
 .STOD   EQUW    *+2
         LDA     1,X
         BPL     L9566
@@ -4437,8 +4524,8 @@ ENDIF
 
 ;       +-
 
-.L956B  DEFWORD "+-"
-        EQUW    L9558
+.PM_NFA DEFWORD "+-"
+        EQUW    STOD_NFA
 .PM     EQUW    DOCOLON
         EQUW    ZEROLESS
         EQUW    ZEROBRANCH,4
@@ -4447,8 +4534,9 @@ ENDIF
 
 ;       D+-
 
-.L957C  DEFWORD "D+-"
-        EQUW    L956B
+.DPM_NFA
+        DEFWORD "D+-"
+        EQUW    PM_NFA
 .DPM    EQUW    DOCOLON
         EQUW    ZEROLESS
         EQUW    ZEROBRANCH,4
@@ -4457,8 +4545,9 @@ ENDIF
 
 ;       ABS
 
-.L958E  DEFWORD "ABS"
-        EQUW    L957C
+.ABS_NFA
+        DEFWORD "ABS"
+        EQUW    DPM_NFA
 .ABS    EQUW    DOCOLON
         EQUW    DUP
         EQUW    PM
@@ -4466,8 +4555,9 @@ ENDIF
 
 ;       DABS
 
-.L959C  DEFWORD "DABS"
-        EQUW    L958E
+.DABS_NFA
+        DEFWORD "DABS"
+        EQUW    ABS_NFA
 .DABS   EQUW    DOCOLON
         EQUW    DUP
         EQUW    DPM
@@ -4475,8 +4565,9 @@ ENDIF
 
 ;       MIN
 
-.L95AB  DEFWORD "MIN"
-        EQUW    L959C
+.MIN_NFA
+        DEFWORD "MIN"
+        EQUW    DABS_NFA
 .MIN    EQUW    DOCOLON
         EQUW    TWODUP
         EQUW    GREATERTHAN
@@ -4487,8 +4578,9 @@ ENDIF
 
 ;       MAX
 
-.L95C1  DEFWORD "MAX"
-        EQUW    L95AB
+.MAX_NFA
+        DEFWORD "MAX"
+        EQUW    MIN_NFA
 .MAX    EQUW    DOCOLON
         EQUW    TWODUP
         EQUW    LESS
@@ -4516,8 +4608,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L95D7  DEFWORD "U/MOD"
-        EQUW    L95C1
+.USLASHMOD_NFA
+        DEFWORD "U/MOD"
+        EQUW    MAX_NFA
 .USLASHMOD
         EQUW    DOCOLON
         EQUW    QUERYDUP
@@ -4530,8 +4623,9 @@ ENDIF
 
 ;       M*
 
-.L95F5  DEFWORD "M*"
-        EQUW    L95D7
+.MSTAR_NFA
+        DEFWORD "M*"
+        EQUW    USLASHMOD_NFA
 .MSTAR  EQUW    DOCOLON
         EQUW    TWODUP
         EQUW    XOR
@@ -4546,8 +4640,9 @@ ENDIF
 
 ;       M/
 
-.L9610  DEFWORD "M/"
-        EQUW    L95F5
+.MSLASH_NFA
+        DEFWORD "M/"
+        EQUW    MSTAR_NFA
 .MSLASH
         EQUW    DOCOLON
         EQUW    OVER
@@ -4569,8 +4664,9 @@ ENDIF
 
 ;       *
 
-.L9637  DEFWORD "*"
-        EQUW    L9610
+.STAR_NFA
+        DEFWORD "*"
+        EQUW    MSLASH_NFA
 .STAR   EQUW    DOCOLON
         EQUW    USTAR
         EQUW    DROP
@@ -4578,8 +4674,9 @@ ENDIF
 
 ;       /MOD
 
-.L9643  DEFWORD "/MOD"
-        EQUW    L9637
+.SLASHMOD_NFA
+        DEFWORD "/MOD"
+        EQUW    STAR_NFA
 .SLASHMOD
         EQUW    DOCOLON
         EQUW    TOR
@@ -4590,8 +4687,9 @@ ENDIF
 
 ;       /
 
-.L9656  DEFWORD "/"
-        EQUW    L9643
+.SLASH_NFA
+        DEFWORD "/"
+        EQUW    SLASHMOD_NFA
 .SLASH  EQUW    DOCOLON
         EQUW    SLASHMOD
         EQUW    SWAP
@@ -4600,8 +4698,9 @@ ENDIF
 
 ;       MOD
 
-.L9664  DEFWORD "MOD"
-        EQUW    L9656
+.MOD_NFA
+        DEFWORD "MOD"
+        EQUW    SLASH_NFA
 .MOD    EQUW    DOCOLON
         EQUW    SLASHMOD
         EQUW    DROP
@@ -4609,8 +4708,9 @@ ENDIF
 
 ;       */MOD
 
-.L9672  DEFWORD "*/MOD"
-        EQUW    L9664
+.STARSLASHMOD_NFA
+        DEFWORD "*/MOD"
+        EQUW    MOD_NFA
 .STARSLASHMOD
         EQUW    DOCOLON
         EQUW    TOR
@@ -4621,8 +4721,9 @@ ENDIF
 
 ;       */
 
-.L9686  DEFWORD "*/"
-        EQUW    L9672
+.STARSLASH_NFA
+        DEFWORD "*/"
+        EQUW    STARSLASHMOD_NFA
 .STARSLASH
         EQUW    DOCOLON
         EQUW    STARSLASHMOD
@@ -4632,8 +4733,9 @@ ENDIF
 
 ;       M/MOD
 
-.L9695  DEFWORD "M/MOD"
-        EQUW    L9686
+.MSLASHMOD_NFA
+        DEFWORD "M/MOD"
+        EQUW    STARSLASH_NFA
 .MSLASHMOD
         EQUW    DOCOLON
         EQUW    TOR
@@ -4651,7 +4753,7 @@ ENDIF
 
 .SPACES_NFA
         DEFWORD "SPACES"
-        EQUW    L9695
+        EQUW    MSLASHMOD_NFA
 .SPACES EQUW    DOCOLON
         EQUW    ZERO
         EQUW    MAX
@@ -4693,7 +4795,7 @@ ENDIF
 ;
 ;       : #>
 ;        2DROP
-;        HLD @   PAD   OVER - 
+;        HLD @   PAD   OVER -
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -4797,7 +4899,8 @@ ENDIF
 
 ;       D.R
 
-.L9751  DEFWORD "D.R"
+.DDOTR_NFA
+        DEFWORD "D.R"
         EQUW    SHARPS_NFA
 .DDOTR  EQUW    DOCOLON
         EQUW    TOR
@@ -4817,8 +4920,9 @@ ENDIF
 
 ;       D.
 
-.L9775  DEFWORD "D."
-        EQUW    L9751
+.DDOT_NFA
+        DEFWORD "D."
+        EQUW    DDOTR_NFA
 .DDOT   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    DDOTR
@@ -4827,8 +4931,9 @@ ENDIF
 
 ;       .R
 
-.L9784  DEFWORD ".R"
-        EQUW    L9775
+.DOTR_NFA
+        DEFWORD ".R"
+        EQUW    DDOT_NFA
 .DOTR   EQUW    DOCOLON
         EQUW    TOR
         EQUW    STOD
@@ -4838,8 +4943,9 @@ ENDIF
 
 ;       .
 
-.L9795  DEFWORD "."
-        EQUW    L9784
+.DOT_NFA
+        DEFWORD "."
+        EQUW    DOTR_NFA
 .DOT    EQUW    DOCOLON
         EQUW    STOD
         EQUW    DDOT
@@ -4847,8 +4953,9 @@ ENDIF
 
 ;       U.
 
-.L97A1  DEFWORD "U."
-        EQUW    L9795
+.UDOT_NFA
+        DEFWORD "U."
+        EQUW    DOT_NFA
 .UDOT   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    DDOT
@@ -4856,8 +4963,9 @@ ENDIF
 
 ;       ?
 
-.L97AE  DEFWORD "?"
-        EQUW    L97A1
+.QUES_NFA
+        DEFWORD "?"
+        EQUW    UDOT_NFA
 .QUES   EQUW    DOCOLON
         EQUW    FETCH
         EQUW    DOT
@@ -4878,8 +4986,9 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L97BA  DEFWORD "DEC."
-        EQUW    L97AE
+.DECDOT_NFA
+        DEFWORD "DEC."
+        EQUW    QUES_NFA
 .DECDOT EQUW    DOCOLON
         EQUW    BASE
         EQUW    FETCH
@@ -4894,7 +5003,7 @@ ENDIF
 
 .HDOT_NFA
         DEFWORD "H."
-        EQUW    L97BA
+        EQUW    DECDOT_NFA
 .HDOT   EQUW    DOCOLON
         EQUW    BASE
         EQUW    FETCH
@@ -4935,7 +5044,7 @@ ENDIF
 
 .TSTAR_NFA
         DEFWORD "2*"
-        EQUW    LA05B-REL
+        EQUW    XMESSAGE_NFA-REL
 .TSTAR  EQUW    *+2
         ASL     0,X
         ROL     1,X
@@ -5381,7 +5490,7 @@ ENDIF
 ;       : NOVEC
 ;        12 ERROR
 ;       ;
-;       
+;
 ; -----------------------------------------------------------------------------
 
 .NOVEC_NFA
@@ -5418,7 +5527,8 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L99E1  DEFWORD "EXVEC:"
+.EXVEC_NFA
+        DEFWORD "EXVEC:"
         EQUW    NOVEC_NFA
 .EXVEC  EQUW    DOCOLON
         EQUW    CREATE
@@ -5433,7 +5543,7 @@ ENDIF
 ;       ASSIGN
 
 .L99FD  DEFIMM  "ASSIGN"
-        EQUW    L99E1
+        EQUW    EXVEC_NFA
 .ASSIGN EQUW    DOCOLON
         EQUW    TICK
         EQUW    EXIT
@@ -5451,7 +5561,8 @@ ENDIF
 ;       ;
 ; -----------------------------------------------------------------------------
 
-.L9A0C  DEFWORD "DOVEC"
+.DOVEC_NFA
+        DEFWORD "DOVEC"
         EQUW    L99FD
 .DOVEC  EQUW    DOCOLON
         EQUW    CFA
@@ -5462,7 +5573,7 @@ ENDIF
 ;       TO-DO
 
 .L9A1E  DEFIMM  "TO-DO"
-        EQUW    L9A0C
+        EQUW    DOVEC_NFA
 .TODO   EQUW    DOCOLON
         EQUW    TICK
         EQUW    STATE
@@ -5492,7 +5603,8 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9A38  DEFWORD "INITVECS"
+.INIVEC_NFA
+        DEFWORD "INITVECS"
         EQUW    L9A1E
 .INIVEC EQUW    DOCOLON
         EQUW    QUERYRSLASHW
@@ -5504,33 +5616,34 @@ ENDIF
         EQUW    LIT,BRACKETEMIT
         EQUW    LIT,EMIT+2
         EQUW    STORE
-        
+
         EQUW    LIT,BRACKETKEY
         EQUW    LIT,KEY+2
         EQUW    STORE
-        
+
         EQUW    LIT,BRACKETCREATE
         EQUW    LIT,CREATE+2
         EQUW    STORE
-        
+
         EQUW    LIT,BRACKETNUM
         EQUW    LIT,NUM+2
         EQUW    STORE
-        
+
         EQUW    LIT,BRACKETABORT
         EQUW    LIT,ABORT+2
         EQUW    STORE
-        
+
         EQUW    LIT,DOLLARMSG
         EQUW    LIT,MESSAGE+2
         EQUW    STORE
-        
+
         EQUW    EXIT
 
 ;       PRUNE
 
-.L9A8F  DEFWORD "PRUNE"
-        EQUW    L9A38
+.PRUNE_NFA
+        DEFWORD "PRUNE"
+        EQUW    INIVEC_NFA
 .PRUNE  EQUW    DOCOLON
         EQUW    VOCLINK
         EQUW    FETCH
@@ -5582,8 +5695,9 @@ ENDIF
 
 ;       FORGET
 
-.L9B03  DEFWORD "FORGET"
-        EQUW    L9A8F
+.FORG_NFA
+        DEFWORD "FORGET"
+        EQUW    PRUNE_NFA
 .FORG   EQUW    DOCOLON
         EQUW    CURRENT
         EQUW    FETCH
@@ -5614,8 +5728,9 @@ ENDIF
 
 ;       DEPTH
 
-.L9B46  DEFWORD "DEPTH"
-        EQUW    L9B03
+.DEPTH_NFA
+        DEFWORD "DEPTH"
+        EQUW    FORG_NFA
 .DEPTH  EQUW    DOCOLON
         EQUW    SPFETCH
         EQUW    SZERO
@@ -5627,8 +5742,9 @@ ENDIF
 
 ;       .S
 
-.L9B5E  DEFWORD ".S"
-        EQUW    L9B46
+.DOTS_NFA
+        DEFWORD ".S"
+        EQUW    DEPTH_NFA
 .DOTS   EQUW    DOCOLON
         EQUW    CR
         EQUW    DEPTH
@@ -5649,8 +5765,9 @@ ENDIF
 
 ;       PICK
 
-.L9B90  DEFWORD "PICK"
-        EQUW    L9B5E
+.PICK_NFA
+        DEFWORD "PICK"
+        EQUW    DOTS_NFA
 .PICK   EQUW    *+2
         SEC
         TYA
@@ -5674,8 +5791,9 @@ ENDIF
 
 ;       ROLL
 
-.L9BB9  DEFWORD "ROLL"
-        EQUW    L9B90
+.ROLL_NFA
+        DEFWORD "ROLL"
+        EQUW    PICK_NFA
 .ROLL   EQUW    *+2
         SEC
         TYA
@@ -5713,8 +5831,9 @@ ENDIF
 
 ;       OSCLI
 
-.L9BF6  DEFWORD "OSCLI"
-        EQUW    L9BB9
+.CLI_NFA
+        DEFWORD "OSCLI"
+        EQUW    ROLL_NFA
 .CLI    EQUW    *+2
         STX     XSAVE
         LDY     1,X
@@ -5726,8 +5845,9 @@ ENDIF
 
 ;       STRING
 
-.L9C0F  DEFWORD "STRING"
-        EQUW    L9BF6
+.STRING_NFA
+        DEFWORD "STRING"
+        EQUW    CLI_NFA
 .STRING EQUW    DOCOLON
         EQUW    MINUSONE
         EQUW    TOIN
@@ -5761,7 +5881,7 @@ ENDIF
 
 .BRACKETDOLLARPLUS_NFA
         DEFWORD "($+)"
-        EQUW    L9C0F
+        EQUW    STRING_NFA
 .BRACKETDOLLARPLUS
         EQUW    DOCOLON
         EQUW    SWAP
@@ -5991,7 +6111,7 @@ ENDIF
 
 .OPEN_NFA
         DEFWORD "OPEN"
-        EQUW    LA093-REL
+        EQUW    XFNAME_NFA-REL
 .OPEN   EQUW    DOCOLON
         EQUW    BRACKETOPEN
         EQUW    DUP
@@ -6007,7 +6127,8 @@ ENDIF
 
 ;       DR/W
 
-.L9DCF  DEFWORD "DR/W"
+.DRSLASHW_NFA
+        DEFWORD "DR/W"
         EQUW    OPEN_NFA
 .DRSLASHW
         EQUW    DOCOLON
@@ -6064,8 +6185,9 @@ ENDIF
 
 ;       EMPTY-BUFFERS
 
-.L9E4A  DEFWORD "EMPTY-BUFFERS"
-        EQUW    LA0DD-REL
+.MTBUF_NFA
+        DEFWORD "EMPTY-BUFFERS"
+        EQUW    XSHARPBUF_NFA-REL
 .MTBUF  EQUW    DOCOLON
         EQUW    FIRST
         EQUW    LIMIT
@@ -6082,8 +6204,9 @@ ENDIF
 
 ;       SETBUF
 
-.L9E74  DEFWORD "SETBUF"
-        EQUW    L9E4A
+.SETBUF_NFA
+        DEFWORD "SETBUF"
+        EQUW    MTBUF_NFA
 .SETBUF EQUW    DOCOLON
         EQUW    LIMIT
         EQUW    BUFSZ
@@ -6097,8 +6220,9 @@ ENDIF
 
 ;       INITBUF
 
-.L9E93  DEFWORD "INITBUF"
-        EQUW    L9E74
+.INIBUF_NFA
+        DEFWORD "INITBUF"
+        EQUW    SETBUF_NFA
 .INIBUF EQUW    DOCOLON
         EQUW    HIADDR
         EQUW    MINUSONE
@@ -6118,8 +6242,9 @@ ENDIF
 
 ;       +BUF
 
-.L9EC5  DEFWORD "+BUF"
-        EQUW    L9E93
+.PBUF_NFA
+        DEFWORD "+BUF"
+        EQUW    INIBUF_NFA
 .PBUF   EQUW    DOCOLON
         EQUW    BUFSZ
         EQUW    PLUS
@@ -6137,8 +6262,9 @@ ENDIF
 
 ;       (UPDATE)
 
-.L9EEA  DEFWORD "(UPDATE)"
-        EQUW    L9EC5
+.BRACKETUPDATE_NFA
+        DEFWORD "(UPDATE)"
+        EQUW    PBUF_NFA
 .BRACKETUPDATE
         EQUW    DOCOLON
         EQUW    PREV
@@ -6153,8 +6279,9 @@ ENDIF
 
 ;       BUFFER
 
-.L9F0B  DEFWORD "BUFFER"
-        EQUW    LA0E8-REL
+.BUFFE_NFA
+        DEFWORD "BUFFER"
+        EQUW    XUPDATE_NFA-REL
 .BUFFE  EQUW    DOCOLON
         EQUW    USE
         EQUW    FETCH
@@ -6187,8 +6314,9 @@ ENDIF
 
 ;       BLOCK
 
-.L9F54  DEFWORD "BLOCK"
-        EQUW    L9F0B
+.BLOCK_NFA
+        DEFWORD "BLOCK"
+        EQUW    BUFFE_NFA
 .BLOCK  EQUW    DOCOLON
         EQUW    OFFSET
         EQUW    FETCH
@@ -6242,8 +6370,9 @@ ENDIF
 
 ;       LOAD
 
-.L9FC8  DEFWORD "LOAD"
-        EQUW    L9F54
+.LOAD_NFA
+        DEFWORD "LOAD"
+        EQUW    BLOCK_NFA
 .LOAD   EQUW    DOCOLON
         EQUW    BLK
         EQUW    FETCH
@@ -6293,7 +6422,8 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-.L9FFB  DEFWORD "EMIT"
+.XEMIT_NFA
+        DEFWORD "EMIT"
         EQUW    BRACKETEMIT_NFA
 .XEMIT  EQUW    DOEXVEC
         EQUW    BRACKETEMIT
@@ -6312,7 +6442,7 @@ EMIT = XEMIT-REL
 
 .KEY_NFA
         DEFWORD "KEY"
-        EQUW    L85D7
+        EQUW    BRACKETKEY_NFA
 .XKEY   EQUW    DOEXVEC
         EQUW    BRACKETKEY
 
@@ -6328,7 +6458,8 @@ KEY = XKEY-REL
 ; -----------------------------------------------------------------------------
 
 
-.LA010  DEFWORD "FIRST"
+.XFIRS_NFA
+        DEFWORD "FIRST"
         EQUW    PAD_NFA
 .XFIRS  EQUW    DOCONSTANT
         EQUW    BUF1
@@ -6344,8 +6475,9 @@ FIRST = XFIRS-REL
 ;
 ; -----------------------------------------------------------------------------
 
-.LA01C  DEFWORD "LIMIT"
-        EQUW    LA010-REL
+.XLIMI_NFA
+        DEFWORD "LIMIT"
+        EQUW    XFIRS_NFA-REL
 .XLIMI  EQUW    DOCONSTANT
         EQUW    EM
 
@@ -6366,8 +6498,9 @@ LIMIT = XLIMI-REL
 ;
 ; -----------------------------------------------------------------------------
 
-.LA028  DEFWORD "CREATE"
-        EQUW    L914F
+.XCREATE_NFA
+        DEFWORD "CREATE"
+        EQUW    BRACKETCREATE_NFA
 .XCREATE
         EQUW    DOEXVEC
         EQUW    BRACKETCREATE
@@ -6376,8 +6509,9 @@ CREATE = XCREATE-REL
 
 ;       NUM
 
-.LA035  DEFWORD "NUM"
-        EQUW    L92F9
+.XNUM_NFA
+        DEFWORD "NUM"
+        EQUW    BRACKETNUM_NFA
 .XNUM   EQUW    DOEXVEC
         EQUW    BRACKETNUM
 
@@ -6396,8 +6530,9 @@ FORTH   =       XFORT-REL
 
 ;       ABORT
 
-.LA04F  DEFWORD "ABORT"
-        EQUW    L9403
+.XABORT_NFA
+        DEFWORD "ABORT"
+        EQUW    BRACKETABORT_NFA
 .XABORT EQUW    DOEXVEC
         EQUW    BRACKETABORT
 
@@ -6414,7 +6549,8 @@ ABORT   =       XABORT-REL
 ;
 ; -----------------------------------------------------------------------------
 
-.LA05B  DEFWORD "MESSAGE"
+.XMESSAGE_NFA
+        DEFWORD "MESSAGE"
         EQUW    MSGNUM_NFA
 .XMESSAGE
         EQUW    DOEXVEC
@@ -6424,7 +6560,8 @@ MESSAGE         =       XMESSAGE-REL
 
 ;       S/FILE
 
-.LA069  DEFWORD "S/FILE"
+.XSSLASHFILE_NFA
+        DEFWORD "S/FILE"
         EQUW    BRACKETRSLASHW_NFA
 .XSSLASHFILE
         EQUW    DOCONSTANT
@@ -6434,8 +6571,9 @@ SSLASHFILE      =       XSSLASHFILE-REL
 
 ;       MAXFILES
 
-.LA076  DEFWORD "MAXFILES"
-        EQUW    LA069-REL
+.XMAXFILES_NFA
+        DEFWORD "MAXFILES"
+        EQUW    XSSLASHFILE_NFA-REL
 .XMAXFILES
         EQUW    DOCONSTANT
         EQUW    20
@@ -6444,8 +6582,9 @@ MAXFILES        =       XMAXFILES-REL
 
 ;       CHANNEL
 
-.LA085  DEFWORD "CHANNEL"
-        EQUW    LA076-REL
+.XCHANNEL_NFA
+        DEFWORD "CHANNEL"
+        EQUW    XMAXFILES_NFA-REL
 .XCHANNEL
         EQUW    DOVARIABLE
         EQUW    18
@@ -6454,8 +6593,9 @@ CHANNEL         =       XCHANNEL-REL
 
 ;       FNAME
 
-.LA093  DEFWORD "FNAME"
-        EQUW    LA085-REL
+.XFNAME_NFA
+        DEFWORD "FNAME"
+        EQUW    XCHANNEL_NFA-REL
 .XFNAME EQUW    DOVARIABLE
         EQUB    "1SCREEN",CarriageReturn
 
@@ -6463,8 +6603,9 @@ FNAME   =       XFNAME-REL
 
 ;       R/W
 
-.LA0A5  DEFWORD "R/W"
-        EQUW    L9DCF
+.XRSLASHW_NFA
+        DEFWORD "R/W"
+        EQUW    DRSLASHW_NFA
 .XRSLASHW
         EQUW    DOEXVEC
         EQUW    DRSLASHW
@@ -6473,8 +6614,9 @@ RSLASHW         =       XRSLASHW-REL
 
 ;       MINBUF
 
-.LA0AF  DEFWORD "MINBUF"
-        EQUW    LA0A5-REL
+.XMINBUF_NFA
+        DEFWORD "MINBUF"
+        EQUW    XRSLASHW_NFA-REL
 .XMINBUF
         EQUW    DOCONSTANT
         EQUW    NOBUF
@@ -6483,8 +6625,9 @@ MINBUF  =       XMINBUF-REL
 
 ;       BUFSZ
 
-.LA0BC  DEFWORD "BUFSZ"
-        EQUW    LA0AF-REL
+.XBUFSZ_NFA
+        DEFWORD "BUFSZ"
+        EQUW    XMINBUF_NFA-REL
 .XBUFSZ EQUW    DOCONSTANT
         EQUW    HDBT
 
@@ -6499,8 +6642,9 @@ BUFSZ   =       XBUFSZ-REL
 ;
 ; -----------------------------------------------------------------------------
 
-.LA0C8  DEFWORD "USE"
-        EQUW    LA0BC-REL
+.XUSE_NFA
+        DEFWORD "USE"
+        EQUW    XBUFSZ_NFA-REL
 .XUSE   EQUW    DOVARIABLE
         EQUW    BUF1
 
@@ -6515,8 +6659,9 @@ USE     =       XUSE-REL
 ;
 ; -----------------------------------------------------------------------------
 
-.LA0D2  DEFWORD "PREV"
-        EQUW    LA0C8-REL
+.XPREV_NFA
+        DEFWORD "PREV"
+        EQUW    XUSE_NFA-REL
 .XPREV  EQUW    DOVARIABLE
         EQUW    BUF1+HDBT
 
@@ -6524,8 +6669,9 @@ PREV    =       XPREV-REL
 
 ;       #BUF
 
-.LA0DD  DEFWORD "#BUF"
-        EQUW    LA0D2-REL
+.XSHARPBUF_NFA
+        DEFWORD "#BUF"
+        EQUW    XPREV_NFA-REL
 .XSHARPBUF
         EQUW    DOVARIABLE
         EQUW    NOBUF
@@ -6534,8 +6680,9 @@ SHARPBUF        =       XSHARPBUF-REL
 
 ;       UPDATE
 
-.LA0E8  DEFWORD "UPDATE"
-        EQUW    L9EEA
+.XUPDATE_NFA
+        DEFWORD "UPDATE"
+        EQUW    BRACKETUPDATE_NFA
 .XUPDATE
         EQUW    DOEXVEC
         EQUW    BRACKETUPDATE
@@ -6544,8 +6691,9 @@ UPDATE  =       XUPDATE-REL
 
 ;       (DISK)
 
-.LA0F5  DEFWORD "(DISK)"
-        EQUW    L9FC8
+.XPDIS_NFA
+        DEFWORD "(DISK)"
+        EQUW    LOAD_NFA
 .XPDIS  EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    5,"DISK",CarriageReturn
@@ -6555,8 +6703,9 @@ PDISK   =       XPDIS-REL
 
 ;       TLD
 
-.LA10A  DEFWORD "TLD"
-        EQUW    LA274
+.XTLD_NFA
+        DEFWORD "TLD"
+        EQUW    DOTLINE_NFA
 .XTLD   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    16
@@ -6569,8 +6718,9 @@ TLD     =       XTLD-REL
 
 ;       TSV
 
-.LA127  DEFWORD "TSV"
-        EQUW    LA10A-REL
+.XTSV_NFA
+        DEFWORD "TSV"
+        EQUW    XTLD_NFA-REL
 .XTSV   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    21,"SAVE""XXXX"" YYYY ZZZZ",CarriageReturn
@@ -6580,8 +6730,9 @@ TSV     =       XTSV-REL
 
 ;       SSV
 
-.LA149  DEFWORD "SSV"
-        EQUW    LA127-REL
+.XSSV_NFA
+        DEFWORD "SSV"
+        EQUW    XTSV_NFA-REL
 .XSSV   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    24
@@ -6596,7 +6747,7 @@ SSV     =       XSSV-REL
 ;       ASSEMBLER
 
 .LA16E  DEFIMM  "ASSEMBLER"
-        EQUW    LA4F6
+        EQUW    TRIAD_NFA
 .XASSEMBLER
         EQUW    DOVOCABULARY
         DEFWORD " "
@@ -6607,8 +6758,9 @@ ASSEMBLER       =       XASSEMBLER-REL
 
 ;       MODE
 
-.LA182  DEFWORD "MODE"
-        EQUW    LA5C7
+.XMOD_NFA
+        DEFWORD "MODE"
+        EQUW    BASEADDR_NFA
 .XMOD   EQUW    DOVARIABLE
         EQUW    2
 
@@ -6644,8 +6796,9 @@ REL_SZ = *-REL_SRC
 
 ;       DISK
 
-.LA19F  DEFWORD "DISK"
-        EQUW    LA0F5-REL
+.DISK_NFA
+        DEFWORD "DISK"
+        EQUW    XPDIS_NFA-REL
 .DISK   EQUW    DOCOLON
         EQUW    HIADDR
         EQUW    MINUSONE
@@ -6664,8 +6817,9 @@ REL_SZ = *-REL_SRC
 
 ;       SAVE-BUFFERS
 
-.LA1CE  DEFWORD "SAVE-BUFFERS"
-        EQUW    LA19F
+.SAVBUF_NFA
+        DEFWORD "SAVE-BUFFERS"
+        EQUW    DISK_NFA
 .SAVBUF EQUW    DOCOLON
         EQUW    FIRST
         EQUW    LIMIT
@@ -6699,8 +6853,9 @@ REL_SZ = *-REL_SRC
 
 ;       FLUSH
 
-.LA21F  DEFWORD "FLUSH"
-        EQUW    LA1CE
+.FLUSH_NFA
+        DEFWORD "FLUSH"
+        EQUW    SAVBUF_NFA
 .FLUSH  EQUW    DOCOLON
         EQUW    SAVBUF
         EQUW    MTBUF
@@ -6709,7 +6864,7 @@ REL_SZ = *-REL_SRC
 ;       -->
 
 .LA22F  DEFIMM  "-->"
-        EQUW    LA21F
+        EQUW    FLUSH_NFA
 .ARROW  EQUW    DOCOLON
         EQUW    QUERYLOADING
         EQUW    ZERO
@@ -6727,7 +6882,8 @@ REL_SZ = *-REL_SRC
 
 ;       (LINE)
 
-.LA251  DEFWORD "(LINE)"
+.PLINE_NFA
+        DEFWORD "(LINE)"
         EQUW    LA22F
 .PLINE  EQUW    DOCOLON
         EQUW    TOR
@@ -6745,8 +6901,9 @@ REL_SZ = *-REL_SRC
 
 ;       .LINE
 
-.LA274  DEFWORD ".LINE"
-        EQUW    LA251
+.DOTLINE_NFA
+        DEFWORD ".LINE"
+        EQUW    PLINE_NFA
 .DOTLINE
         EQUW    DOCOLON
         EQUW    PLINE
@@ -6756,8 +6913,9 @@ REL_SZ = *-REL_SRC
 
 ;       4HEX
 
-.LA286  DEFWORD "4HEX"
-        EQUW    LA149-REL
+.FHEX_NFA
+        DEFWORD "4HEX"
+        EQUW    XSSV_NFA-REL
 .FHEX   EQUW    DOCOLON
         EQUW    BASE
         EQUW    FETCH
@@ -6777,8 +6935,8 @@ REL_SZ = *-REL_SRC
 
 ;       TR
 
-.LA2AD  DEFWORD "TR"
-        EQUW    LA286
+.TR_NFA DEFWORD "TR"
+        EQUW    FHEX_NFA
 .TR     EQUW    DOCOLON
         EQUW    FHEX
         EQUW    LIT,TLD+2
@@ -6797,8 +6955,8 @@ REL_SZ = *-REL_SRC
 
 ;       TW
 
-.LA2D8  DEFWORD "TW"
-        EQUW    LA2AD
+.TW_NFA DEFWORD "TW"
+        EQUW    TR_NFA
 .TW     EQUW    DOCOLON
         EQUW    FHEX
         EQUW    LIT,TSV+2
@@ -6826,8 +6984,9 @@ REL_SZ = *-REL_SRC
 
 ;       TR/W
 
-.LA319  DEFWORD "TR/W"
-        EQUW    LA2D8
+.TRSLASHW_NFA
+        DEFWORD "TR/W"
+        EQUW    TW_NFA
 .TRSLASHW
         EQUW    DOCOLON
         EQUW    ZEROBRANCH,8
@@ -6853,8 +7012,9 @@ REL_SZ = *-REL_SRC
 ;
 ; -----------------------------------------------------------------------------
 
-.LA330  DEFWORD "?R/W"
-        EQUW    LA319
+.QUERYRSLASHW_NFA
+        DEFWORD "?R/W"
+        EQUW    TRSLASHW_NFA
 .QUERYRSLASHW
         EQUW    DOCOLON
         EQUW    QUERYFILE
@@ -6872,8 +7032,9 @@ REL_SZ = *-REL_SRC
 
 ;       TAPE
 
-.LA35F  DEFWORD "TAPE"
-        EQUW    LA330
+.TAPE_NFA
+        DEFWORD "TAPE"
+        EQUW    QUERYRSLASHW_NFA
 .TAPE   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    5,"TAPE",CarriageReturn
@@ -6884,8 +7045,9 @@ REL_SZ = *-REL_SRC
 
 ;       CREATE-SCREENS
 
-.LA37C  DEFWORD "CREATE-SCREENS"
-        EQUW    LA35F
+.CRESCR_NFA
+        DEFWORD "CREATE-SCREENS"
+        EQUW    TAPE_NFA
 .CRESCR EQUW    DOCOLON
         EQUW    QUERYFILE
         EQUW    LIT,4
@@ -6955,8 +7117,9 @@ REL_SZ = *-REL_SRC
 
 ;       LIST
 
-.LA456  DEFWORD "LIST"
-        EQUW    LA37C
+.LIST_NFA
+        DEFWORD "LIST"
+        EQUW    CRESCR_NFA
 .LIST   EQUW    DOCOLON
         EQUW    DECIM
         EQUW    CR
@@ -6993,15 +7156,17 @@ REL_SZ = *-REL_SRC
 
 ;       79-STANDARD
 
-.LA4AC  DEFWORD "79-STANDARD"
-        EQUW    LA456
+.STD79_NFA
+        DEFWORD "79-STANDARD"
+        EQUW    LIST_NFA
 .STD79  EQUW    DOCOLON
         EQUW    EXIT
 
 ;       INDEX
 
-.LA4BE  DEFWORD "INDEX"
-        EQUW    LA4AC
+.INDEX_NFA
+        DEFWORD "INDEX"
+        EQUW    STD79_NFA
 .INDEX  EQUW    DOCOLON
         EQUW    LIT,$C
         EQUW    EMIT
@@ -7025,8 +7190,9 @@ REL_SZ = *-REL_SRC
 
 ;       TRIAD
 
-.LA4F6  DEFWORD "TRIAD"
-        EQUW    LA4BE
+.TRIAD_NFA
+        DEFWORD "TRIAD"
+        EQUW    INDEX_NFA
 .TRIAD  EQUW    DOCOLON
         EQUW    LIT,$C
         EQUW    EMIT
@@ -7048,7 +7214,8 @@ REL_SZ = *-REL_SRC
 
 ;       ?CURRENT
 
-.LA52C  DEFWORD "?CURRENT"
+.QCURR_NFA
+        DEFWORD "?CURRENT"
         EQUW    LA16E-REL
 .QCURR  EQUW    DOCOLON
         EQUW    TWOPLUS
@@ -7057,7 +7224,7 @@ REL_SZ = *-REL_SRC
         EQUW    MINUS
         EQUW    LIT,14
         EQUW    QUERYERROR
-        EQUW    EXIT    
+        EQUW    EXIT
 
 ;       N
 
@@ -7145,7 +7312,8 @@ REL_SZ = *-REL_SRC
 
 ;       BASE-ADDR
 
-.LA5C7  DEFWORD "BASE-ADDR"
+.BASEADDR_NFA
+        DEFWORD "BASE-ADDR"
         EQUW    LA5BA
 .BASEADDR
         EQUW    DOVARIABLE
@@ -7156,8 +7324,9 @@ REL_SZ = *-REL_SRC
 
 ;       .A
 
-.LA5F5  DEFWORD ".A"
-        EQUW    LA182-REL
+.DOTA_NFA
+        DEFWORD ".A"
+        EQUW    XMOD_NFA-REL
 .DOTA   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    AMODE
@@ -7166,8 +7335,9 @@ REL_SZ = *-REL_SRC
 
 ;       #
 
-.LA604  DEFWORD "#"
-        EQUW    LA5F5
+.ANUM_NFA
+        DEFWORD "#"
+        EQUW    DOTA_NFA
 .ANUM   EQUW    DOCOLON
         EQUW    ONE
         EQUW    AMODE
@@ -7176,8 +7346,9 @@ REL_SZ = *-REL_SRC
 
 ;       MEM
 
-.LA612  DEFWORD "MEM"
-        EQUW    LA604
+.MEM_NFA
+        DEFWORD "MEM"
+        EQUW    ANUM_NFA
 .MEM    EQUW    DOCOLON
         EQUW    TWO
         EQUW    AMODE
@@ -7186,8 +7357,9 @@ REL_SZ = *-REL_SRC
 
 ;       ,X
 
-.LA622  DEFWORD ",X"
-        EQUW    LA612
+.COMX_NFA
+        DEFWORD ",X"
+        EQUW    MEM_NFA
 .COMX   EQUW    DOCOLON
         EQUW    LIT,3
         EQUW    AMODE
@@ -7196,8 +7368,9 @@ REL_SZ = *-REL_SRC
 
 ;       ,Y
 
-.LA633  DEFWORD ",Y"
-        EQUW    LA622
+.COMY_NFA
+        DEFWORD ",Y"
+        EQUW    COMX_NFA
 .COMY   EQUW    DOCOLON
         EQUW    LIT,4
         EQUW    AMODE
@@ -7206,8 +7379,9 @@ REL_SZ = *-REL_SRC
 
 ;       X)
 
-.LA644  DEFWORD "X)"
-        EQUW    LA633
+.XPAR_NFA
+        DEFWORD "X)"
+        EQUW    COMY_NFA
 .XPAR   EQUW    DOCOLON
         EQUW    LIT,5
         EQUW    AMODE
@@ -7216,8 +7390,9 @@ REL_SZ = *-REL_SRC
 
 ;       )Y
 
-.LA655  DEFWORD ")Y"
-        EQUW    LA644
+.PARY_NFA
+        DEFWORD ")Y"
+        EQUW    XPAR_NFA
 .PARY   EQUW    DOCOLON
         EQUW    LIT,6
         EQUW    AMODE
@@ -7226,8 +7401,9 @@ REL_SZ = *-REL_SRC
 
 ;       )
 
-.LA666  DEFWORD ")"
-        EQUW    LA655
+.APAR_NFA
+        DEFWORD ")"
+        EQUW    PARY_NFA
 .APAR   EQUW    DOCOLON
         EQUW    LIT,$F
         EQUW    AMODE
@@ -7236,8 +7412,9 @@ REL_SZ = *-REL_SRC
 
 ;       BOT
 
-.LA676  DEFWORD "BOT"
-        EQUW    LA666
+.ABOT_NFA
+        DEFWORD "BOT"
+        EQUW    APAR_NFA
 .ABOT   EQUW    DOCOLON
         EQUW    COMX
         EQUW    ZERO
@@ -7245,8 +7422,9 @@ REL_SZ = *-REL_SRC
 
 ;       SEC
 
-.LA684  DEFWORD "SEC"
-        EQUW    LA676
+.ASEC_NFA
+        DEFWORD "SEC"
+        EQUW    ABOT_NFA
 .ASEC   EQUW    DOCOLON
         EQUW    COMX
         EQUW    TWO
@@ -7254,8 +7432,9 @@ REL_SZ = *-REL_SRC
 
 ;       RP)
 
-.LA692  DEFWORD "RP)"
-        EQUW    LA684
+.RPP_NFA
+        DEFWORD "RP)"
+        EQUW    ASEC_NFA
 .RPP    EQUW    DOCOLON
         EQUW    COMX
         EQUW    LIT,$101
@@ -7263,8 +7442,9 @@ REL_SZ = *-REL_SRC
 
 ;       CHKMODE
 
-.LA6A2  DEFWORD "CHKMODE"
-        EQUW    LA692
+.CHKMOD_NFA
+        DEFWORD "CHKMODE"
+        EQUW    RPP_NFA
 .CHKMOD EQUW    DOCOLON
         EQUW    ZEROBRANCH,$1A
         EQUW    AMODE
@@ -7297,8 +7477,9 @@ REL_SZ = *-REL_SRC
 
 ;       SOP
 
-.LA6F4  DEFWORD "SOP"
-        EQUW    LA6A2
+.SOP_NFA
+        DEFWORD "SOP"
+        EQUW    CHKMOD_NFA
 .SOP    EQUW    DOCOLON
         EQUW    CREATE
         EQUW    CCOMMA
@@ -7312,7 +7493,7 @@ REL_SZ = *-REL_SRC
 ;       BRK,
 
 .LA70D  DEFWORD "BRK,"
-        EQUW    LA6F4
+        EQUW    SOP_NFA
         EQUW    DOSOP
         EQUB    0
 
@@ -7486,7 +7667,8 @@ REL_SZ = *-REL_SRC
 
 ;       MOP
 
-.LA807  DEFWORD "MOP"
+.MOP_NFA
+        DEFWORD "MOP"
         EQUW    LA7FD
 .MOP    EQUW    DOCOLON
         EQUW    CREATE
@@ -7544,7 +7726,7 @@ REL_SZ = *-REL_SRC
 ;       ADC,
 
 .LA88E  DEFWORD "ADC,"
-        EQUW    LA807
+        EQUW    MOP_NFA
         EQUW    DOMOP
         EQUB    $60,$6E,$1C
 
@@ -7690,7 +7872,8 @@ REL_SZ = *-REL_SRC
 
 ;       JMP,
 
-.LA98A  DEFWORD "JMP,"
+.JMPP_NFA
+        DEFWORD "JMP,"
         EQUW    LA97E
 .JMPP   EQUW    DOMOP
         EQUB    $40,$80,$84
@@ -7698,7 +7881,7 @@ REL_SZ = *-REL_SRC
 ;       BIT,
 
 .LA996  DEFWORD "BIT,"
-        EQUW    LA98A
+        EQUW    JMPP_NFA
         EQUW    DOMOP
         EQUB    $20,$84,4
 
@@ -7771,7 +7954,8 @@ REL_SZ = *-REL_SRC
 
 ;       IF,
 
-.LAA1A  DEFWORD "IF,"
+.AIF_NFA
+        DEFWORD "IF,"
         EQUW    LAA0A
 .AIF    EQUW    DOCOLON
         EQUW    CCOMMA
@@ -7783,8 +7967,9 @@ REL_SZ = *-REL_SRC
 
 ;       THEN,
 
-.LAA2E  DEFWORD "THEN,"
-        EQUW    LAA1A
+.ATHEN_NFA
+        DEFWORD "THEN,"
+        EQUW    AIF_NFA
 .ATHEN  EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    TWO
@@ -7806,8 +7991,9 @@ REL_SZ = *-REL_SRC
 
 ;       ELSE,
 
-.LAA5E  DEFWORD "ELSE,"
-        EQUW    LAA2E
+.AELSE_NFA
+        DEFWORD "ELSE,"
+        EQUW    ATHEN_NFA
 .AELSE  EQUW    DOCOLON
         EQUW    TWO
         EQUW    QUERYPAIRS
@@ -7828,8 +8014,9 @@ REL_SZ = *-REL_SRC
 
 ;       BEGIN,
 
-.LAA88  DEFWORD "BEGIN,"
-        EQUW    LAA5E
+.ABEGIN_NFA
+        DEFWORD "BEGIN,"
+        EQUW    AELSE_NFA
 .ABEGIN EQUW    DOCOLON
         EQUW    HERE
         EQUW    ONE
@@ -7837,8 +8024,9 @@ REL_SZ = *-REL_SRC
 
 ;       UNTIL,
 
-.LAA99  DEFWORD "UNTIL,"
-        EQUW    LAA88
+.AUNTIL_NFA
+        DEFWORD "UNTIL,"
+        EQUW    ABEGIN_NFA
 .AUNTIL EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    SWAP
@@ -7854,8 +8042,9 @@ REL_SZ = *-REL_SRC
 
 ;       AGAIN,
 
-.LAABA  DEFWORD "AGAIN,"
-        EQUW    LAA99
+.AAGAIN_NFA
+        DEFWORD "AGAIN,"
+        EQUW    AUNTIL_NFA
 .AAGAIN EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    ONE
@@ -7865,8 +8054,9 @@ REL_SZ = *-REL_SRC
 
 ;       WHILE,
 
-.LAACF  DEFWORD "WHILE,"
-        EQUW    LAABA
+.AWHIL_NFA
+        DEFWORD "WHILE,"
+        EQUW    AAGAIN_NFA
 .AWHIL  EQUW    DOCOLON
         EQUW    OVER
         EQUW    ONE
@@ -7876,8 +8066,9 @@ REL_SZ = *-REL_SRC
 
 ;       REPEAT,
 
-.LAAE4  DEFWORD "REPEAT,"
-        EQUW    LAACF
+.AREPEA_NFA
+        DEFWORD "REPEAT,"
+        EQUW    AWHIL_NFA
 .AREPEA EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    TWO
@@ -7894,8 +8085,9 @@ REL_SZ = *-REL_SRC
 
 ;       MACRO
 
-.LAB08  DEFWORD "MACRO"
-        EQUW    LAAE4
+.MACRO_NFA
+        DEFWORD "MACRO"
+        EQUW    AREPEA_NFA
 .MACRO  EQUW    DOCOLON
         EQUW    LIT,ASSEMBLER+2
         EQUW    QCURR
@@ -7906,7 +8098,7 @@ REL_SZ = *-REL_SRC
 
 .ENDCODE_NFA
         DEFIMM  "END-CODE"
-        EQUW    LAB08
+        EQUW    MACRO_NFA
         EQUW    DOCOLON
         EQUW    CURRENT
         EQUW    FETCH
@@ -7920,7 +8112,7 @@ REL_SZ = *-REL_SRC
 ;       CODE
 
 .LAB39  DEFIMM  "CODE"
-        EQUW    LA52C
+        EQUW    QCURR_NFA
 .CODE   EQUW    DOCOLON
         EQUW    QUERYEXEC
         EQUW    CREATE
@@ -7936,7 +8128,8 @@ REL_SZ = *-REL_SRC
 
 ;       LOCATE
 
-.LAB58  DEFWORD "LOCATE"
+.LOCATE_NFA
+        DEFWORD "LOCATE"
         EQUW    EDITOR_NFA-REL
 .LOCATE EQUW    DOCOLON
         EQUW    QUERYFILE
@@ -7962,8 +8155,9 @@ REL_SZ = *-REL_SRC
 
 ;       SAVE
 
-.LAB99  DEFWORD "SAVE"
-        EQUW    LAB58
+.SAVE_NFA
+        DEFWORD "SAVE"
+        EQUW    LOCATE_NFA
 .SAVE   EQUW    DOCOLON
         EQUW    SCR
         EQUW    FETCH
@@ -7983,8 +8177,9 @@ REL_SZ = *-REL_SRC
 
 ;       CLRSCR
 
-.LABC9  DEFWORD "CLRSCR"
-        EQUW    LAB99
+.CLRSCR_NFA
+        DEFWORD "CLRSCR"
+        EQUW    SAVE_NFA
 .CLRSCR EQUW    DOCOLON
         EQUW    SCR
         EQUW    FETCH
@@ -8012,7 +8207,7 @@ REL_SZ = *-REL_SRC
 ;       PROGRAM
 
 .LAC04  DEFWORD "PROGRAM"
-        EQUW    LABC9
+        EQUW    CLRSCR_NFA
         EQUW    DOCOLON
         EQUW    CR
         EQUW    BRACKETDOTQUOTE
@@ -8027,7 +8222,8 @@ REL_SZ = *-REL_SRC
 
 ;       ANOTHER
 
-.LAC36  DEFWORD "ANOTHER"
+.ANOTHR_NFA
+        DEFWORD "ANOTHER"
         EQUW    LAC04
 .ANOTHR EQUW    DOCOLON
         EQUW    ONE
@@ -8038,8 +8234,9 @@ REL_SZ = *-REL_SRC
 
 ;       MORE
 
-.LAC4C  DEFWORD "MORE"
-        EQUW    LAC36
+.MORE_NFA
+        DEFWORD "MORE"
+        EQUW    ANOTHR_NFA
 .MORE   EQUW    DOCOLON
         EQUW    SAVE
         EQUW    ANOTHR
@@ -8047,8 +8244,9 @@ REL_SZ = *-REL_SRC
 
 ;       TEXT
 
-.LAC5B  DEFWORD "TEXT"
-        EQUW    LAC4C
+.TEXT_NFA
+        DEFWORD "TEXT"
+        EQUW    MORE_NFA
 .TEXT   EQUW    DOCOLON
         EQUW    PAD
         EQUW    CSLASHL
@@ -8066,8 +8264,9 @@ REL_SZ = *-REL_SRC
 
 ;       LINE
 
-.LAC7E  DEFWORD "LINE"
-        EQUW    LAC5B
+.LINE_NFA
+        DEFWORD "LINE"
+        EQUW    TEXT_NFA
 .LINE   EQUW    DOCOLON
         EQUW    DUP
         EQUW    LIT,$FFF0
@@ -8082,8 +8281,9 @@ REL_SZ = *-REL_SRC
 
 ;       WHERE
 
-.LAC9F  DEFWORD "WHERE"
-        EQUW    LAC7E
+.WHERE_NFA
+        DEFWORD "WHERE"
+        EQUW    LINE_NFA
 .WHERE  EQUW    DOCOLON
         EQUW    DUP
         EQUW    BSLASHSCR
@@ -8119,7 +8319,8 @@ REL_SZ = *-REL_SRC
 
 ;       #LOCATE
 
-.LACEE  DEFWORD "#LOCATE"
+.NLOCAT_NFA
+        DEFWORD "#LOCATE"
         EQUW    FORTH+2
 .NLOCAT EQUW    DOCOLON
         EQUW    RSHARP
@@ -8132,7 +8333,7 @@ REL_SZ = *-REL_SRC
 
 .SHARPLEAD_NFA
         DEFWORD "#LEAD"
-        EQUW    LACEE
+        EQUW    NLOCAT_NFA
 .SHARPLEAD
         EQUW    DOCOLON
         EQUW    NLOCAT
@@ -8158,7 +8359,8 @@ REL_SZ = *-REL_SRC
 
 ;       -MOVE
 
-.LAD2F  DEFWORD "-MOVE"
+.DMOVE_NFA
+        DEFWORD "-MOVE"
         EQUW    SHARPLAG_NFA
 .DMOVE  EQUW    DOCOLON
         EQUW    LINE
@@ -8169,8 +8371,8 @@ REL_SZ = *-REL_SRC
 
 ;       H
 
-.LAD43  DEFWORD "H"
-        EQUW    LAD2F
+.HH_NFA DEFWORD "H"
+        EQUW    DMOVE_NFA
 .HH     EQUW    DOCOLON
         EQUW    LINE
         EQUW    PAD
@@ -8184,8 +8386,8 @@ REL_SZ = *-REL_SRC
 
 ;       E
 
-.LAD5B  DEFWORD "E"
-        EQUW    LAD43
+.EE_NFA DEFWORD "E"
+        EQUW    HH_NFA
 .EE     EQUW    DOCOLON
         EQUW    LINE
         EQUW    CSLASHL
@@ -8195,8 +8397,8 @@ REL_SZ = *-REL_SRC
 
 ;       S
 
-.LAD6B  DEFWORD "S"
-        EQUW    LAD5B
+.S_NFA  DEFWORD "S"
+        EQUW    EE_NFA
 .S      EQUW    DOCOLON
         EQUW    DUP
         EQUW    LIT,$FFF0
@@ -8218,8 +8420,8 @@ REL_SZ = *-REL_SRC
 
 ;       D
 
-.LAD9B  DEFWORD "D"
-        EQUW    LAD6B
+.DD_NFA DEFWORD "D"
+        EQUW    S_NFA
 .DD     EQUW    DOCOLON
         EQUW    DUP
         EQUW    HH
@@ -8242,8 +8444,9 @@ REL_SZ = *-REL_SRC
 
 ;       M
 
-.LADCD  DEFWORD "M"
-        EQUW    LAD9B
+.EMM_NFA
+        DEFWORD "M"
+        EQUW    DD_NFA
 .EMM    EQUW    DOCOLON
         EQUW    RSHARP
         EQUW    PLUSSTORE
@@ -8262,8 +8465,8 @@ REL_SZ = *-REL_SRC
 
 ;       T
 
-.LADF1  DEFWORD "T"
-        EQUW    LADCD
+.TT_NFA DEFWORD "T"
+        EQUW    EMM_NFA
 .TT     EQUW    DOCOLON
         EQUW    DUP
         EQUW    CSLASHL
@@ -8277,8 +8480,8 @@ REL_SZ = *-REL_SRC
 
 ;       L
 
-.LAE09  DEFWORD "L"
-        EQUW    LADF1
+.LL_NFA DEFWORD "L"
+        EQUW    TT_NFA
 .LL     EQUW    DOCOLON
         EQUW    SCR
         EQUW    FETCH
@@ -8289,8 +8492,8 @@ REL_SZ = *-REL_SRC
 
 ;       R
 
-.LAE1B  DEFWORD "R"
-        EQUW    LAE09
+.R_NFA  DEFWORD "R"
+        EQUW    LL_NFA
 .R      EQUW    DOCOLON
         EQUW    PAD
         EQUW    ONEPLUS
@@ -8300,8 +8503,8 @@ REL_SZ = *-REL_SRC
 
 ;       P
 
-.LAE2B  DEFWORD "P"
-        EQUW    LAE1B
+.PP_NFA DEFWORD "P"
+        EQUW    R_NFA
 .PP     EQUW    DOCOLON
         EQUW    ONE
         EQUW    TEXT
@@ -8309,7 +8512,7 @@ REL_SZ = *-REL_SRC
         EQUW    EXIT
 
 .I_NFA  DEFWORD "I"
-        EQUW    LAE2B
+        EQUW    PP_NFA
 .I      EQUW    DOCOLON
         EQUW    DUP
         EQUW    S
@@ -8329,7 +8532,8 @@ REL_SZ = *-REL_SRC
 
 ;       CLEAR
 
-.LAE57  DEFWORD "CLEAR"
+.CLEAR_NFA
+        DEFWORD "CLEAR"
         EQUW    TOP_NFA
 .CLEAR  EQUW    DOCOLON
         EQUW    SCR
@@ -8344,8 +8548,9 @@ REL_SZ = *-REL_SRC
 
 ;       COPY
 
-.LAE77  DEFWORD "COPY"
-        EQUW    LAE57
+.COPY_NFA
+        DEFWORD "COPY"
+        EQUW    CLEAR_NFA
 .COPY   EQUW    DOCOLON
         EQUW    BSLASHSCR
         EQUW    STAR
@@ -8374,8 +8579,9 @@ REL_SZ = *-REL_SRC
 
 ;       MATCH
 
-.LAEB2  DEFWORD "MATCH"
-        EQUW    LAE77
+.MATCH_NFA
+        DEFWORD "MATCH"
+        EQUW    COPY_NFA
 .MATCH  EQUW    *+2
         LDA     #4
         JSR     SETUP
@@ -8421,8 +8627,9 @@ REL_SZ = *-REL_SRC
 
 ;       1LINE
 
-.LAF08  DEFWORD "1LINE"
-        EQUW    LAEB2
+.ONELINE_NFA
+        DEFWORD "1LINE"
+        EQUW    MATCH_NFA
 .ONELINE
         EQUW    DOCOLON
         EQUW    SHARPLAG
@@ -8435,8 +8642,9 @@ REL_SZ = *-REL_SRC
 
 ;       $FIND
 
-.DOLLARFIND_NFA         DEFWORD "$FIND"
-        EQUW    LAF08
+.DOLLARFIND_NFA
+        DEFWORD "$FIND"
+        EQUW    ONELINE_NFA
 .DOLLARFIND
         EQUW    DOCOLON
         EQUW    LIT,$3FF
@@ -8483,7 +8691,7 @@ REL_SZ = *-REL_SRC
 
 ;       N
 
-.LAF7F  DEFWORD "N"
+.NN_NFA DEFWORD "N"
         EQUW    DELETE_NFA
 .NN     EQUW    DOCOLON
         EQUW    DOLLARFIND
@@ -8493,8 +8701,8 @@ REL_SZ = *-REL_SRC
 
 ;       F
 
-.LAF8D  DEFWORD "F"
-        EQUW    LAF7F
+.FF_NFA DEFWORD "F"
+        EQUW    NN_NFA
 .FF     EQUW    DOCOLON
         EQUW    ONE
         EQUW    TEXT
@@ -8503,8 +8711,8 @@ REL_SZ = *-REL_SRC
 
 ;       B
 
-.LAF9B  DEFWORD "B"
-        EQUW    LAF8D
+.BB_NFA DEFWORD "B"
+        EQUW    FF_NFA
 .BB     EQUW    DOCOLON
         EQUW    PAD
         EQUW    CFETCH
@@ -8514,8 +8722,8 @@ REL_SZ = *-REL_SRC
 
 ;       X
 
-.LAFAB  DEFWORD "X"
-        EQUW    LAF9B
+.XX_NFA DEFWORD "X"
+        EQUW    BB_NFA
 .XX     EQUW    DOCOLON
         EQUW    ONE
         EQUW    TEXT
@@ -8529,8 +8737,9 @@ REL_SZ = *-REL_SRC
 
 ;       TILL
 
-.LAFC3  DEFWORD "TILL"
-        EQUW    LAFAB
+.TILL_NFA
+        DEFWORD "TILL"
+        EQUW    XX_NFA
 .TILL   EQUW    DOCOLON
         EQUW    SHARPLEAD
         EQUW    PLUS
@@ -8552,7 +8761,7 @@ REL_SZ = *-REL_SRC
 ;       C
 
 .C_NFA  DEFWORD "C"
-        EQUW    LAFC3
+        EQUW    TILL_NFA
         EQUW    DOCOLON
         EQUW    ONE
         EQUW    TEXT
@@ -8595,8 +8804,9 @@ REL_SZ = *-REL_SRC
 ;
 ; -----------------------------------------------------------------------------
 
-.LB02E  DEFWORD "<CMOVE"
-        EQUW    LAC9F
+.CMOVU_NFA
+        DEFWORD "<CMOVE"
+        EQUW    WHERE_NFA
 .CMOVU  EQUW    *+2
         LDA     #3
         JSR     SETUP
@@ -8643,7 +8853,7 @@ REL_SZ = *-REL_SRC
 ;         DUP HERE U< 25 ?ERROR  ( system memory clash if below HERE )
 ;         ROT FIRST -            ( calculate count of bytes to move )
 ;         >R  SWAP
-;         DUP PREV +!            ( add distance to PREV ) 
+;         DUP PREV +!            ( add distance to PREV )
 ;         DUP USE +!             ( add distance to USE  )
 ;         >R  FIRST              ( retrieve old FIRST )
 ;         OVER [ ' FIRST ] !     ( update FIRST with calculated value )
@@ -8661,8 +8871,9 @@ REL_SZ = *-REL_SRC
 ;
 ; -----------------------------------------------------------------------------
 
-.LB06B  DEFWORD "MOVE-BUFFERS"
-        EQUW    LB02E
+.MOVBUF_NFA
+        DEFWORD "MOVE-BUFFERS"
+        EQUW    CMOVU_NFA
 .MOVBUF EQUW    DOCOLON
         EQUW    LIMIT
         EQUW    TWODUP
@@ -8710,8 +8921,9 @@ REL_SZ = *-REL_SRC
 
 ;       PLOT
 
-.LB0E0  DEFWORD "PLOT"
-        EQUW    LB06B
+.PLOT_NFA
+        DEFWORD "PLOT"
+        EQUW    MOVBUF_NFA
 .PLOT   EQUW    DOCOLON
         EQUW    LIT,$19
         EQUW    TOVDU
@@ -8738,8 +8950,9 @@ TOPNFA  =       *
 ;
 ; -----------------------------------------------------------------------------
 
-.LB107  DEFWORD "$MSG"
-        EQUW    LB0E0
+.DOLLARMSG_NFA
+        DEFWORD "$MSG"
+        EQUW    PLOT_NFA
 .DOLLARMSG
         EQUW    DOCOLON
         EQUW    DUP
@@ -8776,8 +8989,8 @@ IF NOT(STRIP)
 
 ;       MM
 
-.LB146  DEFWORD "MM"
-        EQUW    LB107
+.MM_NFA DEFWORD "MM"
+        EQUW    DOLLARMSG_NFA
 .MM     EQUW    DOCOLON
         EQUW    TWOPLUS
         EQUW    SWAP
@@ -8796,8 +9009,8 @@ IF NOT(STRIP)
 
 ;       M1
 
-.LB169  DEFWORD "M1"
-        EQUW    LB146
+.M1_NFA DEFWORD "M1"
+        EQUW    MM_NFA
 .M1     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    11,"Stack empty"
@@ -8805,8 +9018,8 @@ IF NOT(STRIP)
 
 ;       M2
 
-.LB180  DEFWORD "M2"
-        EQUW    LB169
+.M2_NFA DEFWORD "M2"
+        EQUW    M1_NFA
 .M2     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    15,"Dictionary full"
@@ -8814,8 +9027,8 @@ IF NOT(STRIP)
 
 ;       M3
 
-.LB19B  DEFWORD "M3"
-        EQUW    LB180
+.M3_NFA DEFWORD "M3"
+        EQUW    M2_NFA
 .M3     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    26,"Has incorrect address mode"
@@ -8823,8 +9036,8 @@ IF NOT(STRIP)
 
 ;       M4
 
-.LB1C1  DEFWORD "M4"
-        EQUW    LB19B
+.M4_NFA DEFWORD "M4"
+        EQUW    M3_NFA
 .M4     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    12,"Isn't unique"
@@ -8832,8 +9045,8 @@ IF NOT(STRIP)
 
 ;       M5
 
-.LB1D9  DEFWORD "M5"
-        EQUW    LB1C1
+.M5_NFA DEFWORD "M5"
+        EQUW    M4_NFA
 .M5     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    29,"Parameter outside valid range"
@@ -8841,8 +9054,8 @@ IF NOT(STRIP)
 
 ;       M6
 
-.LB202  DEFWORD "M6"
-        EQUW    LB1D9
+.M6_NFA DEFWORD "M6"
+        EQUW    M5_NFA
 .M6     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    26,"Screen number out of range"
@@ -8850,8 +9063,8 @@ IF NOT(STRIP)
 
 ;       M7
 
-.LB228  DEFWORD "M7"
-        EQUW    LB202
+.M7_NFA DEFWORD "M7"
+        EQUW    M6_NFA
 .M7     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    10,"Stack full"
@@ -8859,8 +9072,8 @@ IF NOT(STRIP)
 
 ;       M8
 
-.LB23E  DEFWORD "M8"
-        EQUW    LB228
+.M8_NFA DEFWORD "M8"
+        EQUW    M7_NFA
 .M8     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    25,"Can't open or extend file"
@@ -8868,8 +9081,8 @@ IF NOT(STRIP)
 
 ;       M9
 
-.LB263  DEFWORD "M9"
-        EQUW    LB23E
+.M9_NFA DEFWORD "M9"
+        EQUW    M8_NFA
 .M9     EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    24,"Read/Write not completed"
@@ -8877,8 +9090,9 @@ IF NOT(STRIP)
 
 ;       M10
 
-.LB287  DEFWORD "M10"
-        EQUW    LB263
+.M10_NFA
+        DEFWORD "M10"
+        EQUW    M9_NFA
 .M10    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    26,"Can't redefine end-of-line"
@@ -8886,8 +9100,9 @@ IF NOT(STRIP)
 
 ;       M11
 
-.LB2AE  DEFWORD "M11"
-        EQUW    LB287
+.M11_NFA
+        DEFWORD "M11"
+        EQUW    M10_NFA
 .M11    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    20,"Can't divide by zero"
@@ -8895,8 +9110,9 @@ IF NOT(STRIP)
 
 ;       M12
 
-.LB2CF  DEFWORD "M12"
-        EQUW    LB2AE
+.M12_NFA
+        DEFWORD "M12"
+        EQUW    M11_NFA
 .M12    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    26,"Undefined execution vector"
@@ -8904,8 +9120,9 @@ IF NOT(STRIP)
 
 ;       M13
 
-.LB2F6  DEFWORD "M13"
-        EQUW    LB2CF
+.M13_NFA
+        DEFWORD "M13"
+        EQUW    M12_NFA
 .M13    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    15,"Branch too long"
@@ -8913,8 +9130,9 @@ IF NOT(STRIP)
 
 ;       M14
 
-.LB312  DEFWORD "M14"
-        EQUW    LB2F6
+.M14_NFA
+        DEFWORD "M14"
+        EQUW    M13_NFA
 .M14    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    28,"Incorrect CURRENT vocabulary"
@@ -8922,8 +9140,9 @@ IF NOT(STRIP)
 
 ;       M15
 
-.LB33B  DEFWORD "M15"
-        EQUW    LB312
+.M15_NFA
+        DEFWORD "M15"
+        EQUW    M14_NFA
 .M15    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    1,' '
@@ -8931,8 +9150,9 @@ IF NOT(STRIP)
 
 ;       M16
 
-.LB349  DEFWORD "M16"
-        EQUW    LB33B
+.M16_NFA
+        DEFWORD "M16"
+        EQUW    M15_NFA
 .M16    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    1,' '
@@ -8940,8 +9160,9 @@ IF NOT(STRIP)
 
 ;       M17
 
-.LB357  DEFWORD "M17"
-        EQUW    LB349
+.M17_NFA
+        DEFWORD "M17"
+        EQUW    M16_NFA
 .M17    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    16,"Compilation only"
@@ -8949,8 +9170,9 @@ IF NOT(STRIP)
 
 ;       M18
 
-.LB374  DEFWORD "M18"
-        EQUW    LB357
+.M18_NFA
+        DEFWORD "M18"
+        EQUW    M17_NFA
 .M18    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    14,"Execution only"
@@ -8958,8 +9180,9 @@ IF NOT(STRIP)
 
 ;       M19
 
-.LB38F  DEFWORD "M19"
-        EQUW    LB374
+.M19_NFA
+        DEFWORD "M19"
+        EQUW    M18_NFA
 .M19    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    23,"Conditionals not paired"
@@ -8967,8 +9190,9 @@ IF NOT(STRIP)
 
 ;       M20
 
-.LB3B3  DEFWORD "M20"
-        EQUW    LB38F
+.M20_NFA
+        DEFWORD "M20"
+        EQUW    M19_NFA
 .M20    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    23,"Definition not finished"
@@ -8976,8 +9200,9 @@ IF NOT(STRIP)
 
 ;       M21
 
-.LB3D7  DEFWORD "M21"
-        EQUW    LB3B3
+.M21_NFA
+        DEFWORD "M21"
+        EQUW    M20_NFA
 .M21    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    23,"In protected dictionary"
@@ -8985,8 +9210,9 @@ IF NOT(STRIP)
 
 ;       M22
 
-.LB3FB  DEFWORD "M22"
-        EQUW    LB3D7
+.M22_NFA
+        DEFWORD "M22"
+        EQUW    M21_NFA
 .M22    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    21,"Use only when LOADing"
@@ -8994,8 +9220,9 @@ IF NOT(STRIP)
 
 ;       M23
 
-.LB41D  DEFWORD "M23"
-        EQUW    LB3FB
+.M23_NFA
+        DEFWORD "M23"
+        EQUW    M22_NFA
 .M23    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    26,"Off current editing screen"
@@ -9003,8 +9230,9 @@ IF NOT(STRIP)
 
 ;       M24
 
-.LB444  DEFWORD "M24"
-        EQUW    LB41D
+.M24_NFA
+        DEFWORD "M24"
+        EQUW    M23_NFA
 .M24    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    25,"NOT in CURRENT vocabulary"
@@ -9012,8 +9240,9 @@ IF NOT(STRIP)
 
 ;       M25
 
-.LB46A  DEFWORD "M25"
-        EQUW    LB444
+.M25_NFA
+        DEFWORD "M25"
+        EQUW    M24_NFA
 .M25    EQUW    DOCOLON
         EQUW    BRACKETDOTQUOTE
         EQUB    7,"No room"

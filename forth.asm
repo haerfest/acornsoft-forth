@@ -423,16 +423,16 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ; -----------------------------------------------------------------------------
 
-.NEXT   LDY     #1              ; With IP pointing pointing somewhere in our
-.NEXTY1 LDA     (IP),Y          ; PFA to the CFA of the next word to execute,
+.NEXT   LDY     #1              ; With IP pointing somewhere in our parameter
+.NEXTY1 LDA     (IP),Y          ; field to the CFA of the next word to execute,
         STA     W+1             ; store that CFA at the code field pointer W .
         DEY                     ; This turns that into an indirect JMP (CFA)
         LDA     (IP),Y          ; to what the CFA of the next word to execute
         STA     W               ; points to.
 
-        CLC                     ; Increment IP by two so its points just
-        LDA     IP              ; beyond the CFA of the next word, to whatever
-        ADC     #2              ; follows next.
+        CLC                     ; Increment IP by two so it points just beyond
+        LDA     IP              ; the CFA of the next word, to whatever follows
+        ADC     #2              ; next.
         STA     IP
         BCC     CheckEscape
         INC     IP+1
@@ -443,7 +443,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
         JMP     W-1             ; W-1 now contains an indirect JMP (CFA), so
                                 ; we continue where the CFA of the next word
-                                ; points at. If that word is implemented in
+                                ; points to. If that word is implemented in
                                 ; Forth, it will be DOCOLON , otherwise it will
                                 ; point to machine code, likely contained in
                                 ; that word's parameter field.

@@ -883,7 +883,17 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         JMP     PUT
 }
 
-;       (FIND)
+; -----------------------------------------------------------------------------
+;
+;       (FIND)   ( addr1\addr2 ... cfa\b\tf )
+;                ( addr1\addr2 ... ff )
+;
+;       > Searches the dictionary starting at the name field address addr2 for
+;       > a match with the text starting at addr1. For a successful match the
+;       > code field (execution) address and length byte of the name field plus
+;       > a true flag are left. If no match is found only a false flag is left.
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETFIND_NFA
         DEFWORD "(FIND)"
@@ -973,60 +983,76 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         DEFWORD "ENCLOSE"
         EQUW    BRACKETFIND_NFA
 .ENCLOSE
-        EQUW    *+2
-        LDA     #2
-        JSR     SETUP
-        TXA
-        SEC
+{       EQUW    *+2
+        LDA     #2              ; First call SETUP to move the addr and
+        JSR     SETUP           ; delimiter from the stack to the scratchpad
+        TXA                     ; at N . Then make room on the stack for four
+        SEC                     ; cells.
         SBC     #8
         TAX
-        DEY
-        STY     N+1
-        DEC     N+3
-.L83CF  INY
-        BNE     L83D6
-        INC     N+1
-        INC     N+3
-.L83D6  LDA     (N+2),Y
-        CMP     N
-        BEQ     L83CF
-        STY     4,X
-        LDA     N+1
-        STA     5,X
-.L83E2  LDA     (N+2),Y
-        BNE     L8404
-        STY     2,X
-        STY     0,X
-        LDA     N+1
+        DEY                     ; Start off with the character index $FF.
+        STY     N+1             ; The unused high byte of the delimiter is used
+                                ; to keep track of the high byte of the offset
+                                ; into the string, and is incremented each time
+                                ; Y wraps back to zero. It isi initialised to
+                                ; $FF as it is immediately incremented back to
+                                ; 0 below.
+        DEC     N+3             ; Likewise for the high byte of the address
+                                ; of the string we work our way through.
+
+.skipDelimiter
+        INY                     ; Move to the next character index. When Y
+        BNE     skip1           ; wraps to zero, increment the high byte of the
+        INC     N+1             ; offset, as well as the high byte of the
+        INC     N+3             ; address of the string.
+.skip1  LDA     (N+2),Y         ; Load the next character from the string and
+        CMP     N               ; check if is equal to the delimiter. If so,
+        BEQ     skipDelimiter   ; skip the delimiter.
+
+        STY     4,X             ; Write n1 onto the stack as we skipped any
+        LDA     N+1             ; initial delimiters and know where the string
+        STA     5,X             ; begins.
+
+.scanString
+        LDA     (N+2),Y         ; Load the next character from the string and
+        BNE     isNonZero       ; call it a day if that is a zero byte.
+
+        STY     2,X             ; Write n2 and n3 onto the stack. They are
+        STY     0,X             ; equal since the string was terminated by a
+        LDA     N+1             ; zero byte and not the delimiter.
         STA     3,X
         STA     1,X
-        TYA
-        CMP     4,X
-        BNE     L8401
+
+        TYA                     ; If n1 is equal to n2 and n3, then we
+        CMP     4,X             ; increment n2.
+        BNE     done
         LDA     N+1
         CMP     5,X
-        BNE     L8401
+        BNE     done
         INC     2,X
-        BNE     L8401
+        BNE     done
         INC     3,X
-.L8401  JMP     NEXT
+.done   JMP     NEXT
 
-.L8404  INY
-        BNE     L840B
-.L8407  INC     N+3
+.isNonZero
+        INY                     ; Move to the next character index.
+        BNE     skip2
+        INC     N+3
         INC     N+1
-.L840B  CMP     N
-        BNE     L83E2
-        STY     0,X
+.skip2  CMP     N               ; Keep scanning if the last character read was
+        BNE     scanString      ; not the delimiter.
+
+        STY     0,X             ; Write n3 onto the stack.
         LDA     N+1
         STA     1,X
-        STA     3,X
-        TYA
-        BNE     L841C
+        STA     3,X             ; Write n2 as n3 minus one onto the stack, as
+        TYA                     ; the string was followed by a delimiter.
+        BNE     skip3
         DEC     3,X
-.L841C  DEY
+.skip3  DEY
         STY     2,X
         JMP     NEXT
+}
 
 ; -----------------------------------------------------------------------------
 ;

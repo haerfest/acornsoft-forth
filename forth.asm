@@ -66,35 +66,36 @@ SetKeyboardRepeatPeriod = $0C
 ;
 ; -----------------------------------------------------------------------------
 
-CarriageReturn          = $0D
-EscapeKey               = $1B
-JmpIndirectOpcode       = $6C
-LineFeed                = $0A
-PrintStrPtr             = $12
+CarriageReturn    = $0D
+EscapeKey         = $1B
+JmpIndirectOpcode = $6C
+LineFeed          = $0A
+PrintStrPtr       = $12
 
 ; -----------------------------------------------------------------------------
 
-BOS     = $10             ; Bottom of the data stack.
-TOS     = $58             ; Top of the data stack.
-N       = $60             ; Scratch-pad area for various use.
-XSAVE   = $68             ; Location to temporarily save the X register.
-W       = XSAVE+2         ; Code field pointer.
-IP      = W+2             ; Interpretive Pointer ("PC"), points to current cell.
-UP      = IP+2            ; User Area pointer, points to UAREA .
+BottomOfStack = $10             ; Bottom of the data stack.
+TopOfStack    = $58             ; Top of the data stack.
+N             = $60             ; Scratch-pad area for various use.
+XSAVE         = $68             ; Location to temporarily save the X register.
+W             = XSAVE+2         ; Code field pointer, points to CFA .
+IP            = W+2             ; Interpretive Pointer ("PC"), points to
+                                ; current cell within PFA .
+UP            = IP+2            ; User Area pointer, points to UserArea .
 
-UserArea            = $400
-WordBuffer          = UserArea+64
-WordBufferSize      = 1+255+2
-TerminalInputBuffer = WordBuffer+WordBufferSize
-PadBuffer           = TerminalInputBuffer+126
-RelocateDestination = PadBuffer+80
+UserArea               = $400
+WordBuffer             = UserArea+64
+WordBufferSize         = 1+255+2
+TerminalInputBuffer    = WordBuffer+WordBufferSize
+PadBuffer              = TerminalInputBuffer+126
+RelocationDestination  = PadBuffer+80
 
-EndOfMemory          = $7C00    ; Default for MODE 7.
-BlockSize            = 1024
-BlockBufferSize      = BlockSize+4
-BlockBufferCount     = 2
-TotalBlockBufferSize = BlockBufferCount*BlockBufferSize
-FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
+EndOfMemory            = $7C00    ; Default for MODE 7, adjusted at run-time.
+BlockSize              = 1024
+BlockBufferSize        = BlockSize+4
+BlockBufferCount       = 2
+TotalBlockBufferSize   = BlockBufferCount*BlockBufferSize
+FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 
 ; -----------------------------------------------------------------------------
 ;
@@ -297,7 +298,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 ;
 ;       ??? Why not refer to these words directly? These bytes may need to be
 ;       there for +ORIGIN to work, so they would go unused, but there is no
-;       need for this indirection.
+;       apparent need for this indirection.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -315,27 +316,26 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 ; -----------------------------------------------------------------------------
 
 .BootUpParameters
-        EQUW    TOPNFA          ; $0C +ORIGIN: last word in FORTH
-                                ;              dictionary.
-        EQUW    $7F             ; $0E +ORIGIN: backspace character.
+        EQUW    LastWordNFA           ; $0C +ORIGIN: last word in FORTH dict.
+        EQUW    $7F                   ; $0E +ORIGIN: backspace character.
 .InitialUP
-        EQUW    UserArea        ; $10 +ORIGIN: initial UP .
-        EQUW    TOS             ; $12 +ORIGIN: initial S0 .
-        EQUW    $01FF           ; $14 +ORIGIN: initial R0 .
-        EQUW    TerminalInputBuffer  ; $16 +ORIGIN: initial TIB .
-        EQUW    31              ; $18 +ORIGIN: initial WIDTH .
-        EQUW    0               ; $1A +ORIGIN: initial WARNING .
-        EQUW    TOPDP           ; $1C +ORIGIN: initial FENCE .
-        EQUW    TOPDP           ; $1E +ORIGIN: initial DP .
-        EQUW    VL0-REL         ; $20 +ORIGIN: initial VOC-LINK .
-        EQUW    1               ; $22 +ORIGIN: initial BLK .
+        EQUW    UserArea              ; $10 +ORIGIN: initial UP .
+        EQUW    TopOfStack            ; $12 +ORIGIN: initial S0 .
+        EQUW    $01FF                 ; $14 +ORIGIN: initial R0 .
+        EQUW    TerminalInputBuffer   ; $16 +ORIGIN: initial TIB .
+        EQUW    31                    ; $18 +ORIGIN: initial WIDTH .
+        EQUW    0                     ; $1A +ORIGIN: initial WARNING .
+        EQUW    TopOfDictionary       ; $1C +ORIGIN: initial FENCE .
+        EQUW    TopOfDictionary       ; $1E +ORIGIN: initial DP .
+        EQUW    VL0-RelocationOffset  ; $20 +ORIGIN: initial VOC-LINK .
+        EQUW    1                     ; $22 +ORIGIN: initial BLK .
 
-        EQUB    "RdeG-H"        ; Author Richard de Grandis-Harrison
+        EQUB    "RdeG-H"              ; Author Richard de Grandis-Harrison
 
 ; -----------------------------------------------------------------------------
 ;
-;       ??? Why not refer to these words directly? There is no need for this
-;       indirection.
+;       ??? Why not refer to these words directly? There is no apparent need
+;       for this indirection.
 ;
 ; -----------------------------------------------------------------------------
 
@@ -1156,7 +1156,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .TOVDU_NFA
         DEFWORD ">VDU"
-        EQUW    XEMIT_NFA-REL
+        EQUW    XEMIT_NFA-RelocationOffset
 .TOVDU  EQUW    *+2
         LDA     0,X
         JSR     OSWRCH
@@ -1435,7 +1435,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .EXIT_NFA
         DEFWORD "EXIT"
-        EQUW    KEY_NFA-REL
+        EQUW    KEY_NFA-RelocationOffset
 .EXIT   EQUW    *+2
         PLA                     ; Pop the previous value of IP, pointing in the
         STA     IP              ; parameter field of the word that called us,
@@ -2299,7 +2299,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .BSLASHBUF_NFA
         DEFWORD "B/BUF"
-        EQUW    XLIMI_NFA-REL
+        EQUW    XLIMI_NFA-RelocationOffset
 .BSLASHBUF
         EQUW    DOCONSTANT
         EQUW    BlockSize
@@ -4039,7 +4039,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .BCOMP_NFA
         DEFIMM  "[COMPILE]"
-        EQUW    XCREATE_NFA-REL
+        EQUW    XCREATE_NFA-RelocationOffset
 .BCOMP  EQUW    DOCOLON
         EQUW    CONTEXT
         EQUW    FETCH
@@ -4089,7 +4089,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 ;
 ;       : ?STACK
 ;        SP@  S0 @   >  1 ?ERROR
-;        SP@  $0010  <  7 ?ERROR   ( BOS = $0010 )
+;        SP@  $0010  <  7 ?ERROR   ( BottomOfStack = $0010 )
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -4105,7 +4105,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
         EQUW    ONE
         EQUW    QUERYERROR
         EQUW    SPFETCH
-        EQUW    LIT,BOS
+        EQUW    LIT,BottomOfStack
         EQUW    LESS
         EQUW    LIT,7
         EQUW    QUERYERROR
@@ -4276,7 +4276,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .INTERPRET_NFA
         DEFWORD "INTERPRET"
-        EQUW    XNUM_NFA-REL
+        EQUW    XNUM_NFA-RelocationOffset
 .INTERPRET
         EQUW    DOCOLON
 
@@ -4383,7 +4383,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .QUIT_NFA
         DEFWORD "QUIT"
-        EQUW    XFORT_NFA-REL
+        EQUW    XFORT_NFA-RelocationOffset
 .QUIT   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    BLK
@@ -4510,7 +4510,7 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 .ESCAPE_NFA
         DEFWORD "ESCAPE"
-        EQUW    XABORT_NFA-REL
+        EQUW    XABORT_NFA-RelocationOffset
 .ESCAPE
         EQUW    DOCOLON
         EQUW    SPSTORE
@@ -4639,9 +4639,9 @@ FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 IF RELOCATE
 
-        EQUW    LIT,RelocateSource
-        EQUW    LIT,RelocateDestination
-        EQUW    LIT,RelocateSize
+        EQUW    LIT,RelocationSource
+        EQUW    LIT,RelocationDestination
+        EQUW    LIT,RelocationSize
         EQUW    CMOVE
 ENDIF
         EQUW    INIVEC
@@ -5303,7 +5303,7 @@ ENDIF
 
 .TSTAR_NFA
         DEFWORD "2*"
-        EQUW    XMESSAGE_NFA-REL
+        EQUW    XMESSAGE_NFA-RelocationOffset
 .TSTAR  EQUW    *+2
         ASL     0,X
         ROL     1,X
@@ -6373,7 +6373,7 @@ ENDIF
 
 .OPEN_NFA
         DEFWORD "OPEN"
-        EQUW    XFNAME_NFA-REL
+        EQUW    XFNAME_NFA-RelocationOffset
 .OPEN   EQUW    DOCOLON
         EQUW    BRACKETOPEN
         EQUW    DUP
@@ -6449,7 +6449,7 @@ ENDIF
 
 .MTBUF_NFA
         DEFWORD "EMPTY-BUFFERS"
-        EQUW    XSHARPBUF_NFA-REL
+        EQUW    XSHARPBUF_NFA-RelocationOffset
 .MTBUF  EQUW    DOCOLON
         EQUW    FIRST
         EQUW    LIMIT
@@ -6543,7 +6543,7 @@ ENDIF
 
 .BUFFE_NFA
         DEFWORD "BUFFER"
-        EQUW    XUPDATE_NFA-REL
+        EQUW    XUPDATE_NFA-RelocationOffset
 .BUFFE  EQUW    DOCOLON
         EQUW    USE
         EQUW    FETCH
@@ -6680,12 +6680,12 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-RelocateSource = *
+RelocationSource = *
 
 IF RELOCATE
-REL = RelocateSource-RelocateDestination
+RelocationOffset = RelocationSource-RelocationDestination
 ELSE
-REL = 0
+RelocationOffset = 0
 ENDIF
 
 ; -----------------------------------------------------------------------------
@@ -6705,7 +6705,7 @@ ENDIF
 .XEMIT  EQUW    DOEXVEC
         EQUW    BRACKETEMIT
 
-EMIT = XEMIT-REL
+EMIT = XEMIT-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6723,7 +6723,7 @@ EMIT = XEMIT-REL
 .XKEY   EQUW    DOEXVEC
         EQUW    BRACKETKEY
 
-KEY = XKEY-REL
+KEY = XKEY-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6741,7 +6741,7 @@ KEY = XKEY-REL
 .XFIRS  EQUW    DOCONSTANT
         EQUW    FirstBlockBuffer
 
-FIRST = XFIRS-REL
+FIRST = XFIRS-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6754,11 +6754,11 @@ FIRST = XFIRS-REL
 
 .XLIMI_NFA
         DEFWORD "LIMIT"
-        EQUW    XFIRS_NFA-REL
+        EQUW    XFIRS_NFA-RelocationOffset
 .XLIMI  EQUW    DOCONSTANT
         EQUW    EndOfMemory
 
-LIMIT = XLIMI-REL
+LIMIT = XLIMI-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6782,7 +6782,7 @@ LIMIT = XLIMI-REL
         EQUW    DOEXVEC
         EQUW    BRACKETCREATE
 
-CREATE = XCREATE-REL
+CREATE = XCREATE-RelocationOffset
 
 ;       NUM
 
@@ -6792,7 +6792,7 @@ CREATE = XCREATE-REL
 .XNUM   EQUW    DOEXVEC
         EQUW    BRACKETNUM
 
-NUM     =       XNUM-REL
+NUM     =       XNUM-RelocationOffset
 
 ;       FORTH
 
@@ -6801,10 +6801,10 @@ NUM     =       XNUM-REL
         EQUW    VOCABULARY_NFA
 .XFORT  EQUW    DOVOCABULARY
         DEFWORD " "
-        EQUW    TOPNFA
+        EQUW    LastWordNFA
 .VL0    EQUW    0
 
-FORTH   =       XFORT-REL
+FORTH   =       XFORT-RelocationOffset
 
 ;       ABORT
 
@@ -6814,7 +6814,7 @@ FORTH   =       XFORT-REL
 .XABORT EQUW    DOEXVEC
         EQUW    BRACKETABORT
 
-ABORT   =       XABORT-REL
+ABORT   =       XABORT-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6834,7 +6834,7 @@ ABORT   =       XABORT-REL
         EQUW    DOEXVEC
         EQUW    DOLLARMSG
 
-MESSAGE         =       XMESSAGE-REL
+MESSAGE         =       XMESSAGE-RelocationOffset
 
 ;       S/FILE
 
@@ -6845,39 +6845,39 @@ MESSAGE         =       XMESSAGE-REL
         EQUW    DOCONSTANT
         EQUW    9
 
-SSLASHFILE      =       XSSLASHFILE-REL
+SSLASHFILE      =       XSSLASHFILE-RelocationOffset
 
 ;       MAXFILES
 
 .XMAXFILES_NFA
         DEFWORD "MAXFILES"
-        EQUW    XSSLASHFILE_NFA-REL
+        EQUW    XSSLASHFILE_NFA-RelocationOffset
 .XMAXFILES
         EQUW    DOCONSTANT
         EQUW    20
 
-MAXFILES        =       XMAXFILES-REL
+MAXFILES        =       XMAXFILES-RelocationOffset
 
 ;       CHANNEL
 
 .XCHANNEL_NFA
         DEFWORD "CHANNEL"
-        EQUW    XMAXFILES_NFA-REL
+        EQUW    XMAXFILES_NFA-RelocationOffset
 .XCHANNEL
         EQUW    DOVARIABLE
         EQUW    18
 
-CHANNEL         =       XCHANNEL-REL
+CHANNEL         =       XCHANNEL-RelocationOffset
 
 ;       FNAME
 
 .XFNAME_NFA
         DEFWORD "FNAME"
-        EQUW    XCHANNEL_NFA-REL
+        EQUW    XCHANNEL_NFA-RelocationOffset
 .XFNAME EQUW    DOVARIABLE
         EQUB    "1SCREEN",CarriageReturn
 
-FNAME   =       XFNAME-REL
+FNAME   =       XFNAME-RelocationOffset
 
 ;       R/W
 
@@ -6888,28 +6888,28 @@ FNAME   =       XFNAME-REL
         EQUW    DOEXVEC
         EQUW    DRSLASHW
 
-RSLASHW         =       XRSLASHW-REL
+RSLASHW         =       XRSLASHW-RelocationOffset
 
 ;       MINBUF
 
 .XMINBUF_NFA
         DEFWORD "MINBUF"
-        EQUW    XRSLASHW_NFA-REL
+        EQUW    XRSLASHW_NFA-RelocationOffset
 .XMINBUF
         EQUW    DOCONSTANT
         EQUW    BlockBufferCount
 
-MINBUF  =       XMINBUF-REL
+MINBUF  =       XMINBUF-RelocationOffset
 
 ;       BUFSZ
 
 .XBUFSZ_NFA
         DEFWORD "BUFSZ"
-        EQUW    XMINBUF_NFA-REL
+        EQUW    XMINBUF_NFA-RelocationOffset
 .XBUFSZ EQUW    DOCONSTANT
         EQUW    BlockBufferSize
 
-BUFSZ   =       XBUFSZ-REL
+BUFSZ   =       XBUFSZ-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6922,11 +6922,11 @@ BUFSZ   =       XBUFSZ-REL
 
 .XUSE_NFA
         DEFWORD "USE"
-        EQUW    XBUFSZ_NFA-REL
+        EQUW    XBUFSZ_NFA-RelocationOffset
 .XUSE   EQUW    DOVARIABLE
         EQUW    FirstBlockBuffer
 
-USE     =       XUSE-REL
+USE     =       XUSE-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -6939,22 +6939,22 @@ USE     =       XUSE-REL
 
 .XPREV_NFA
         DEFWORD "PREV"
-        EQUW    XUSE_NFA-REL
+        EQUW    XUSE_NFA-RelocationOffset
 .XPREV  EQUW    DOVARIABLE
         EQUW    FirstBlockBuffer+BlockBufferSize
 
-PREV    =       XPREV-REL
+PREV    =       XPREV-RelocationOffset
 
 ;       #BUF
 
 .XSHARPBUF_NFA
         DEFWORD "#BUF"
-        EQUW    XPREV_NFA-REL
+        EQUW    XPREV_NFA-RelocationOffset
 .XSHARPBUF
         EQUW    DOVARIABLE
         EQUW    BlockBufferCount
 
-SHARPBUF        =       XSHARPBUF-REL
+SHARPBUF        =       XSHARPBUF-RelocationOffset
 
 ;       UPDATE
 
@@ -6965,7 +6965,7 @@ SHARPBUF        =       XSHARPBUF-REL
         EQUW    DOEXVEC
         EQUW    BRACKETUPDATE
 
-UPDATE  =       XUPDATE-REL
+UPDATE  =       XUPDATE-RelocationOffset
 
 ;       (DISK)
 
@@ -6977,7 +6977,7 @@ UPDATE  =       XUPDATE-REL
         EQUB    5,"DISK",CarriageReturn
         EQUW    EXIT
 
-PDISK   =       XPDIS-REL
+PDISK   =       XPDIS-RelocationOffset
 
 ;       TLD
 
@@ -6992,25 +6992,25 @@ PDISK   =       XPDIS-REL
 .LA120  EQUB    "YYYY",CarriageReturn
         EQUW    EXIT
 
-TLD     =       XTLD-REL
+TLD     =       XTLD-RelocationOffset
 
 ;       TSV
 
 .XTSV_NFA
         DEFWORD "TSV"
-        EQUW    XTLD_NFA-REL
+        EQUW    XTLD_NFA-RelocationOffset
 .XTSV   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    21,"SAVE""XXXX"" YYYY ZZZZ",CarriageReturn
         EQUW    EXIT
 
-TSV     =       XTSV-REL
+TSV     =       XTSV-RelocationOffset
 
 ;       SSV
 
 .XSSV_NFA
         DEFWORD "SSV"
-        EQUW    XTSV_NFA-REL
+        EQUW    XTSV_NFA-RelocationOffset
 .XSSV   EQUW    DOCOLON
         EQUW    BRACKETCLI
         EQUB    24
@@ -7020,7 +7020,7 @@ TSV     =       XTSV-REL
 .LA167  EQUB    "YYYY",CarriageReturn
         EQUW    EXIT
 
-SSV     =       XSSV-REL
+SSV     =       XSSV-RelocationOffset
 
 ;       ASSEMBLER
 
@@ -7031,9 +7031,9 @@ SSV     =       XSSV-REL
         EQUW    DOVOCABULARY
         DEFWORD " "
         EQUW    ENDCODE_NFA
-.LA180  EQUW    VL0-REL
+.LA180  EQUW    VL0-RelocationOffset
 
-ASSEMBLER       =       XASSEMBLER-REL
+ASSEMBLER       =       XASSEMBLER-RelocationOffset
 
 ;       MODE
 
@@ -7043,7 +7043,7 @@ ASSEMBLER       =       XASSEMBLER-REL
 .XMOD   EQUW    DOVARIABLE
         EQUW    2
 
-AMODE   =       XMOD-REL
+AMODE   =       XMOD-RelocationOffset
 
 ; -----------------------------------------------------------------------------
 ;
@@ -7058,10 +7058,10 @@ AMODE   =       XMOD-REL
         EQUW    DOVOCABULARY
         DEFWORD " "
         EQUW    C_NFA
-        EQUW    LA180-REL
+        EQUW    LA180-RelocationOffset
         EQUB    0
 
-EDITOR  =       XEDITOR-REL
+EDITOR  =       XEDITOR-RelocationOffset
 
 
 ; -----------------------------------------------------------------------------
@@ -7071,13 +7071,13 @@ EDITOR  =       XEDITOR-REL
 ;
 ; -----------------------------------------------------------------------------
 
-RelocateSize = *-RelocateSource
+RelocationSize = *-RelocationSource
 
 ;       DISK
 
 .DISK_NFA
         DEFWORD "DISK"
-        EQUW    XPDIS_NFA-REL
+        EQUW    XPDIS_NFA-RelocationOffset
 .DISK   EQUW    DOCOLON
         EQUW    HIADDR
         EQUW    MINUSONE
@@ -7195,7 +7195,7 @@ RelocateSize = *-RelocateSource
 
 .FHEX_NFA
         DEFWORD "4HEX"
-        EQUW    XSSV_NFA-REL
+        EQUW    XSSV_NFA-RelocationOffset
 .FHEX   EQUW    DOCOLON
         EQUW    BASE
         EQUW    FETCH
@@ -7357,12 +7357,12 @@ RelocateSize = *-RelocateSource
         EQUW    EQUAL
         EQUW    ZEROBRANCH,$6A
         EQUW    FHEX
-        EQUW    LIT,LA167-REL
+        EQUW    LIT,LA167-RelocationOffset
         EQUW    SWAP
         EQUW    CMOVE
         EQUW    BLANKS
         EQUW    FHEX
-        EQUW    LIT,LA162-REL
+        EQUW    LIT,LA162-RelocationOffset
         EQUW    SWAP
         EQUW    CMOVE
         EQUW    CR
@@ -7386,7 +7386,7 @@ RelocateSize = *-RelocateSource
         EQUW    DUP
         EQUW    FNAME
         EQUW    CSTORE
-        EQUW    LIT,LA159-REL
+        EQUW    LIT,LA159-RelocationOffset
         EQUW    CSTORE
         EQUW    SSV
         EQUW    BRACKETLOOP,$FFD8
@@ -7496,7 +7496,7 @@ RelocateSize = *-RelocateSource
 
 .QCURR_NFA
         DEFWORD "?CURRENT"
-        EQUW    XASSEMBLER_NFA-REL
+        EQUW    XASSEMBLER_NFA-RelocationOffset
 .QCURR  EQUW    DOCOLON
         EQUW    TWOPLUS
         EQUW    CURRENT
@@ -7606,7 +7606,7 @@ RelocateSize = *-RelocateSource
 
 .DOTA_NFA
         DEFWORD ".A"
-        EQUW    XMOD_NFA-REL
+        EQUW    XMOD_NFA-RelocationOffset
 .DOTA   EQUW    DOCOLON
         EQUW    ZERO
         EQUW    AMODE
@@ -8411,7 +8411,7 @@ RelocateSize = *-RelocateSource
 
 .LOCATE_NFA
         DEFWORD "LOCATE"
-        EQUW    EDITOR_NFA-REL
+        EQUW    EDITOR_NFA-RelocationOffset
 .LOCATE EQUW    DOCOLON
         EQUW    QUERYFILE
         EQUW    LIT,4
@@ -9221,7 +9221,7 @@ RelocateSize = *-RelocateSource
         EQUW    TOVDU
         EQUW    EXIT
 
-TOPNFA  =       *
+LastWordNFA = *
 
 ; -----------------------------------------------------------------------------
 ;
@@ -9558,13 +9558,13 @@ ENDIF
         EQUB    25,"NOT in CURRENT vocabulary"
         EQUB    7,"No room"
 
-TOPDP   =       *       ; TOP OF DICTIONARY
+TopOfDictionary = *
 
-FOR n,TOPDP,$BFFF
+FOR n,TopOfDictionary,$BFFF
 
         EQUB    $FF
 
 NEXT
 
-        PRINT   "ROM bytes free: ",$C000-TOPDP
+        PRINT   "ROM bytes free: ",$C000-TopOfDictionary
         SAVE    "forth-assembled.rom",RomStart,*

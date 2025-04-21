@@ -82,20 +82,19 @@ W       = XSAVE+2         ; Code field pointer.
 IP      = W+2             ; Interpretive Pointer ("PC"), points to current cell.
 UP      = IP+2            ; User Area pointer, points to UAREA .
 
-WordBufferSize   = 1+255+2
+UserArea            = $400
+WordBuffer          = UserArea+64
+WordBufferSize      = 1+255+2
+TerminalInputBuffer = WordBuffer+WordBufferSize
+PadBuffer           = TerminalInputBuffer+126
+RelocateDestination = PadBuffer+80
 
-UserArea   = $400         ; The location of the user area, pointed to by UP .
-WordBuffer = UserArea+64  ; The buffer used by 1WORD and WORD .
-TIBB       = WordBuffer+WordBufferSize
-PADD       = TIBB+126     ; PAD
-REL_DST    = PADD+80      ; RAM address to relocate certain words to ($610).
-
-EM      = $7C00           ; END OF MEMORY+1
-BLKSIZ  = 1024
-HDBT    = BLKSIZ+4
-NOBUF   = 2
-BUFS    = NOBUF*HDBT
-BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
+EndOfMemory          = $7C00    ; Default for MODE 7.
+BlockSize            = 1024
+BlockBufferSize      = BlockSize+4
+BlockBufferCount     = 2
+TotalBlockBufferSize = BlockBufferCount*BlockBufferSize
+FirstBlockBuffer     = EndOfMemory-TotalBlockBufferSize
 
 ; -----------------------------------------------------------------------------
 ;
@@ -323,7 +322,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    UserArea        ; $10 +ORIGIN: initial UP .
         EQUW    TOS             ; $12 +ORIGIN: initial S0 .
         EQUW    $01FF           ; $14 +ORIGIN: initial R0 .
-        EQUW    TIBB            ; $16 +ORIGIN: initial TIB .
+        EQUW    TerminalInputBuffer  ; $16 +ORIGIN: initial TIB .
         EQUW    31              ; $18 +ORIGIN: initial WIDTH .
         EQUW    0               ; $1A +ORIGIN: initial WARNING .
         EQUW    TOPDP           ; $1C +ORIGIN: initial FENCE .
@@ -2294,7 +2293,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         DEFWORD "PAD"
         EQUW    CSLASHL_NFA
 .PAD    EQUW    DOCONSTANT
-        EQUW    PADD
+        EQUW    PadBuffer
 
 ;       B/BUF
 
@@ -2303,7 +2302,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    XLIMI_NFA-REL
 .BSLASHBUF
         EQUW    DOCONSTANT
-        EQUW    BLKSIZ
+        EQUW    BlockSize
 
 ;       B/SCR
 
@@ -4640,9 +4639,9 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 IF RELOCATE
 
-        EQUW    LIT,REL_SRC
-        EQUW    LIT,REL_DST
-        EQUW    LIT,REL_SZ
+        EQUW    LIT,RelocateSource
+        EQUW    LIT,RelocateDestination
+        EQUW    LIT,RelocateSize
         EQUW    CMOVE
 ENDIF
         EQUW    INIVEC
@@ -6681,10 +6680,10 @@ ENDIF
 ;
 ; -----------------------------------------------------------------------------
 
-REL_SRC = *
+RelocateSource = *
 
 IF RELOCATE
-REL = REL_SRC-REL_DST
+REL = RelocateSource-RelocateDestination
 ELSE
 REL = 0
 ENDIF
@@ -6740,7 +6739,7 @@ KEY = XKEY-REL
         DEFWORD "FIRST"
         EQUW    PAD_NFA
 .XFIRS  EQUW    DOCONSTANT
-        EQUW    BUF1
+        EQUW    FirstBlockBuffer
 
 FIRST = XFIRS-REL
 
@@ -6757,7 +6756,7 @@ FIRST = XFIRS-REL
         DEFWORD "LIMIT"
         EQUW    XFIRS_NFA-REL
 .XLIMI  EQUW    DOCONSTANT
-        EQUW    EM
+        EQUW    EndOfMemory
 
 LIMIT = XLIMI-REL
 
@@ -6898,7 +6897,7 @@ RSLASHW         =       XRSLASHW-REL
         EQUW    XRSLASHW_NFA-REL
 .XMINBUF
         EQUW    DOCONSTANT
-        EQUW    NOBUF
+        EQUW    BlockBufferCount
 
 MINBUF  =       XMINBUF-REL
 
@@ -6908,7 +6907,7 @@ MINBUF  =       XMINBUF-REL
         DEFWORD "BUFSZ"
         EQUW    XMINBUF_NFA-REL
 .XBUFSZ EQUW    DOCONSTANT
-        EQUW    HDBT
+        EQUW    BlockBufferSize
 
 BUFSZ   =       XBUFSZ-REL
 
@@ -6925,7 +6924,7 @@ BUFSZ   =       XBUFSZ-REL
         DEFWORD "USE"
         EQUW    XBUFSZ_NFA-REL
 .XUSE   EQUW    DOVARIABLE
-        EQUW    BUF1
+        EQUW    FirstBlockBuffer
 
 USE     =       XUSE-REL
 
@@ -6942,7 +6941,7 @@ USE     =       XUSE-REL
         DEFWORD "PREV"
         EQUW    XUSE_NFA-REL
 .XPREV  EQUW    DOVARIABLE
-        EQUW    BUF1+HDBT
+        EQUW    FirstBlockBuffer+BlockBufferSize
 
 PREV    =       XPREV-REL
 
@@ -6953,7 +6952,7 @@ PREV    =       XPREV-REL
         EQUW    XPREV_NFA-REL
 .XSHARPBUF
         EQUW    DOVARIABLE
-        EQUW    NOBUF
+        EQUW    BlockBufferCount
 
 SHARPBUF        =       XSHARPBUF-REL
 
@@ -7072,7 +7071,7 @@ EDITOR  =       XEDITOR-REL
 ;
 ; -----------------------------------------------------------------------------
 
-REL_SZ = *-REL_SRC
+RelocateSize = *-RelocateSource
 
 ;       DISK
 

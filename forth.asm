@@ -82,13 +82,13 @@ W       = XSAVE+2         ; Code field pointer.
 IP      = W+2             ; Interpretive Pointer ("PC"), points to current cell.
 UP      = IP+2            ; User Area pointer, points to UAREA .
 
-WBSIZ   = 1+255+2         ; WORD BUFFER SIZE
+WordBufferSize   = 1+255+2
 
-UAREA   = $400            ; The location of the user area, pointed to by UP .
-WORDBU  = UAREA+64        ; WORD BUFFER
-TIBB    = WORDBU+WBSIZ    ; TERMINAL INPUT BUFFER
-PADD    = TIBB+126        ; PAD
-REL_DST = PADD+80         ; RAM address to relocate certain words to ($610).
+UserArea   = $400         ; The location of the user area, pointed to by UP .
+WordBuffer = UserArea+64  ; The buffer used by 1WORD and WORD .
+TIBB       = WordBuffer+WordBufferSize
+PADD       = TIBB+126     ; PAD
+REL_DST    = PADD+80      ; RAM address to relocate certain words to ($610).
 
 EM      = $7C00           ; END OF MEMORY+1
 BLKSIZ  = 1024
@@ -309,7 +309,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 ; -----------------------------------------------------------------------------
 ;
-;       At start-up, the user variable pointer UP is reset to point to UAREA
+;       At start-up, the user variable pointer UP is reset to point to UserArea
 ;       and (part of) the boot-up parameters below in there are reset to their
 ;       default values.  See the routine at Restart .
 ;
@@ -320,7 +320,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
                                 ;              dictionary.
         EQUW    $7F             ; $0E +ORIGIN: backspace character.
 .InitialUP
-        EQUW    UAREA           ; $10 +ORIGIN: initial UP .
+        EQUW    UserArea        ; $10 +ORIGIN: initial UP .
         EQUW    TOS             ; $12 +ORIGIN: initial S0 .
         EQUW    $01FF           ; $14 +ORIGIN: initial R0 .
         EQUW    TIBB            ; $16 +ORIGIN: initial TIB .
@@ -351,7 +351,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 
 .Restart
         LDA     InitialUP+1             ; Reset the User Pointer (UP) to its
-        STA     UP+1                    ; initial value UAREA .
+        STA     UP+1                    ; initial value UserArea.
         LDA     InitialUP
         STA     UP
 
@@ -944,7 +944,31 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         PHA
         JMP     PUSH
 
-;       ENCLOSE
+; -----------------------------------------------------------------------------
+;
+;       ENCLOSE   ( addr\c ... addr\n1\n2\n3 )
+;
+;       > The text-scanning primitive used by WORD . The text starting at the
+;       > address addr is searched, ignoring leading occurrences of the
+;       > delimiter c, until the first non-delimiter character is found. The
+;       > offset from addr to this character is left as n1. The search
+;       > continues from this point until the first delimiter after the text is
+;       > found. The offsets from addr to this delimiter and to the first
+;       > character not included in the scan are left as n2 and n3
+;       > respectively. The search will, regardless of the value of c, stop on
+;       > encountering an ASCII null (0) which is regarded as an unconditional
+;       > delimiter. The null is never included in the scan.
+;       >
+;       > Examples:
+;       >
+;       > Text at addr           n1      n2      n3
+;       >
+;       > ccABCDcc               2       6       7
+;       > ABCDcc                 0       4       5
+;       > ABC0cc                 0       3       3
+;       > 0ccc                   0       1       0
+;
+; -----------------------------------------------------------------------------
 
 .ENCLOSE_NFA
         DEFWORD "ENCLOSE"
@@ -2225,7 +2249,14 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .TWO    EQUW    DOCONSTANT
         EQUW    2
 
-;       BL
+; -----------------------------------------------------------------------------
+;
+;       BL   ( ... n )
+;
+;       > A constant that leaves the ASCII value for 'blank' or 'space' (hex
+;       > 20).
+;
+; -----------------------------------------------------------------------------
 
 .BL_NFA DEFWORD "BL"
         EQUW    TWO_NFA
@@ -2423,7 +2454,15 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    DOUSER
         EQUB    $14
 
-;       BLK
+; -----------------------------------------------------------------------------
+;
+;       BLK   ( ... addr )
+;
+;       > A user variable containing the number of the mass storage block from
+;       > which input is being taken. If BLK contains zero input is taken from
+;       > the keyboard.
+;
+; -----------------------------------------------------------------------------
 
 .BLK_NFA
         DEFWORD "BLK"
@@ -2431,7 +2470,15 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 .BLK    EQUW    DOUSER
         EQUB    $16
 
-;       >IN
+; -----------------------------------------------------------------------------
+;
+;       >IN   ( ... addr )
+;
+;       > A user variable containing the byte offset to the present position
+;       > in the input buffer (terminal or mass storage) from where the next
+;       > text will be accepted.
+;
+; -----------------------------------------------------------------------------
 
 .TOIN_NFA
         DEFWORD ">IN"
@@ -3464,8 +3511,7 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
 ;
 ;       : QUERY
 ;        TIB @ 80 EXPECT
-;        0 >IN
-;        !
+;        0 >IN !
 ;       ;
 ;
 ; -----------------------------------------------------------------------------
@@ -3596,7 +3642,29 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    CSTORE
         EQUW    EXIT
 
-;       (WORD)  ( C -- ADR LEN )
+; -----------------------------------------------------------------------------
+;
+;       (WORD)  ( c ... addr\count )
+;
+;       > Scans the input buffer, ignoring leading occurrences of the delimiter
+;       > character c, for the next word. The start address and length of the
+;       > text up to the terminating delimiter are left. No text is moved. See
+;       > WORD .
+;
+;       : (WORD)
+;        BLK @
+;        ?DUP IF
+;         BLOCK                  ( will be scanning a block if BLK is > 0 )
+;        ELSE
+;         TIB @                  ( otherwise scanning the TIB )
+;        THEN
+;        >IN @ +                 ( add input position to buffer address )
+;        SWAP ENCLOSE
+;        >IN +!                  ( update input position )
+;        OVER - ROT ROT + SWAP   ( rearrange parse results to addr\count )
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .PWORD_NFA
         DEFWORD "(WORD)"
@@ -3625,23 +3693,55 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    SWAP
         EQUW    EXIT
 
-;       WDSZ
+; -----------------------------------------------------------------------------
+;
+;       WDSZ   ( ... n )
+;
+;       > A constant returning the length in bytes of the buffer used by WORD .
+;       > It is set to a value of 258, allowing strings of up to 256 (WDSZ-2)
+;       > characters to be handled.
+;
+; -----------------------------------------------------------------------------
 
 .WDSZ_NFA
         DEFWORD "WDSZ"
         EQUW    PWORD_NFA
 .WDSZ   EQUW    DOCONSTANT
-        EQUW    WBSIZ           ; WORD BUFFER SIZE
+        EQUW    WordBufferSize
 
-;       WBFR
+; -----------------------------------------------------------------------------
+;
+;       WBFR   ( ... addr )
+;
+;       > A constant returning the address of the first byte of the buffer used
+;       > by WORD .
+;
+; -----------------------------------------------------------------------------
 
 .WBFR_NFA
         DEFWORD "WBFR"
         EQUW    WDSZ_NFA
 .WBFR   EQUW    DOCONSTANT
-        EQUW    WORDBU          ; WORD BUFFER ADDR
+        EQUW    WordBuffer
 
-;       1WORD
+; -----------------------------------------------------------------------------
+;
+;       1WORD   ( c ... addr )
+;
+;       > Similar to WORD , except that the character count at the beginning of
+;       > the string at address addr has a minimum value of 1, even if the
+;       > input stream is exhausted when 1WORD is called. See WORD .
+;
+;       : 1WORD
+;        (WORD)
+;        WDSZ MIN       ( limit the count to the word buffer size )
+;        WBFR C!        ( store the count as the first byte )
+;        WBFR COUNT 1+  ( convert it to buffer address and count+1 on stack )
+;        CMOVE          ( move the word after the count byte )
+;        WBFR
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .ONEWRD_NFA
         DEFWORD "1WORD"
@@ -3659,7 +3759,27 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    WBFR
         EQUW    EXIT
 
-;       WORD
+; -----------------------------------------------------------------------------
+;
+;       WORD   ( c ... addr )
+;
+;       > Accepts characters from the input stream until the non-zero
+;       > delimiting character c is encountered, or the input stream is
+;       > exhausted. Leading delimiters are ignored. The characters are stored
+;       > as a packed string with the character count in the first position.
+;       > The actual delimiter encountered (c or null) is stored at the end of
+;       > the text but not included in the count. If the input stream is
+;       > exhausted when WORD is called then a zero length will result. The
+;       > address of the count byte of the string is left on the stack.
+;
+;       : WORD
+;        1WORD
+;        DUP 1+ C@ 0= IF   ( check if the first character is null )
+;         0 OVER C!        ( if so, set the length byte to zero   )
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .WORD_NFA
         DEFWORD "WORD"
@@ -3705,7 +3825,25 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    RFROM
         EQUW    EXIT
 
-;       -FIND
+; -----------------------------------------------------------------------------
+;
+;       -FIND   ( addr ... cfa\b\tf )
+;               ( addr ... ff )
+;
+;       > Used as, for example,
+;       >
+;       > CONTEXT @ @ -FIND nnnn
+;       >
+;       > The CONTEXT and FORTH vocabularies are searched for the word nnnn. If
+;       > found, the entry's code field (execution) address, name length byte
+;       > and a true flag are left; otherwise just a false flag is left.
+;
+;       : -FIND
+;        BL 1WORD
+;        SWAP (FIND)
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .DFIND_NFA
         DEFWORD "-FIND"
@@ -3717,7 +3855,27 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    BRACKETFIND
         EQUW    EXIT
 
-;       FIND
+; -----------------------------------------------------------------------------
+;
+;       FIND   ( ... addr )
+;
+;       > Used as
+;       >
+;       > FIND NNNN
+;       >
+;       > and leaves the code field (execution) address of the next word name
+;       > NNNN found in the input stream. If that word cannot be found in a
+;       > search of CONTEXT and then FORTH , zero is left.
+;
+;       : FIND
+;        CONTEXT @ @ -FIND IF
+;         DROP
+;        ELSE
+;         0
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .FIND_NFA
         DEFWORD "FIND"
@@ -3924,7 +4082,18 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    LITERAL
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ?STACK
+;
+;       > Issues an error message if the stack is out of bounds.
+;
+;       : ?STACK
+;        SP@  S0 @   >  1 ?ERROR
+;        SP@  $0010  <  7 ?ERROR   ( BOS = $0010 )
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .QSTAC_NFA
         DEFWORD "?STACK"
@@ -4075,7 +4244,36 @@ BUF1    = EM-BUFS         ; FIRST BLOCK BUFFER
         EQUW    DLITER
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       INTERPRET
+;
+;       > The outer text interpreter which either executes or compiles a text
+;       > sequence, depending on STATE , from the current input buffer
+;       > (terminal or tape). If the word name cannot be found after a search
+;       > of the CONTEXT and then the FORTH vocabularies, it is converted to a
+;       > number using the current base. If this conversion also fails an error
+;       > message is given.
+;       >
+;       > If a decimal point is found as the last character of a number a
+;       > double number will be left on the stack. The number itself will not
+;       > contain any reference to the decimal point.
+;
+;       : INTERPRET
+;        CONTEXT @ @
+;        -FIND IF
+;         STATE @ < IF
+;          ,
+;         ELSE
+;          EXECUTE
+;         THEN
+;         WBFR
+;         NUM
+;         ?STACK
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .INTERPRET_NFA
         DEFWORD "INTERPRET"
@@ -6377,7 +6575,22 @@ ENDIF
         EQUW    TWOPLUS
         EQUW    EXIT
 
-;       BLOCK
+; -----------------------------------------------------------------------------
+;
+;       BLOCK   ( n ... addr )
+;
+;       > Leaves the address of the first byte of data in block (screen) n. If
+;       > the block is not already in memory it is transferred from mass storage
+;       > into whichever memory buffer has least-recently been accessed. If the
+;       > block occupying that buffer has been UPDATEd it is written to mass
+;       > storage before block n is read into the buffer. Only the data in the
+;       > latest block referenced by BLOCK is guaranteed not to have been
+;       > overwritten.
+;
+;       : BLOCK  << TODO >>
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .BLOCK_NFA
         DEFWORD "BLOCK"

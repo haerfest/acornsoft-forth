@@ -899,59 +899,73 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         DEFWORD "(FIND)"
         EQUW    DIGIT_NFA
 .BRACKETFIND
-        EQUW    *+2
-        LDA     #2
-        JSR     SETUP
+{       EQUW    *+2
+        LDA     #2              ; First call SETUP to move the two addresses
+        JSR     SETUP           ; from the stack to the scratchpad at N .
         STX     XSAVE
-.L8361  LDY     #0
+.compareName
+        LDY     #0              ; Start with the first character in the names.
+        LDA     (N),Y           ; Load the first character of the current
+        EOR     (N+2),Y         ; dictionary entry, and compare it to the name
+        AND     #$3F            ; we're looking for. Only check lower 6 bits. 
+        BNE     skipToEndOfWord
+.compareNextChar
+        INY                     ; Advance to the next character and compare it.
         LDA     (N),Y
         EOR     (N+2),Y
-        AND     #$3F
-        BNE     L8398
-.L836B  INY
-        LDA     (N),Y
-        EOR     (N+2),Y
-        ASL     A
-        BNE     L8396
-        BCC     L836B
+        ASL     A               ; Shift the end-of-word bit difference out to
+                                ; the carry bit. Note that the text we search
+                                ; for will not end with that bit set, but a
+                                ; matching dictionary entry will, so its EOR
+                                ; result will then be set and so will the
+                                ; carry.
+        BNE     differentChar   ; If the characters are different, jump away.
+        BCC     compareNextChar ; Otherwise if the carry is not set, we did not
+                                ; yet reach the end of the dictionary word, so
+                                ; keep comparing. Otherwise we found our match.
         LDX     XSAVE
-        DEX
-        DEX
+        DEX                     ; We found our match, reserve space for four
+        DEX                     ; cells on the stack.
         DEX
         DEX
         CLC
-        TYA
-        ADC     #3
-        ADC     N
+        TYA                     ; With Y pointing to the last character in the
+        ADC     #3              ; name, add three to skip past the LFA to the 
+        ADC     N               ; word's CFA. Write the CFA to the stack.
         STA     2,X
-        LDY     #0
+        LDY     #0              ; Restore the invariant that Y should be zero.
         TYA
         ADC     N+1
         STA     3,X
-        STY     1,X
-        LDA     (N),Y
-        STA     0,X
-        LDA     #1
+        STY     1,X             ; Zero the high byte of the length result.
+        LDA     (N),Y           ; Load the length byte from the dictionary 
+        STA     0,X             ; entry and write it to the stack. Then PUSH a
+        LDA     #1              ; true flag to indicate the word was found..
         PHA
         JMP     PUSH
 
-.L8396  BCS     L839D
-.L8398  INY
-        LDA     (N),Y
-        BPL     L8398
-.L839D  INY
-        LDA     (N),Y
-        TAX
+.differentChar
+        BCS     atEndOfWord     ; If the high bit was set, we reached the end
+                                ; of the word and can try the next word.
+.skipToEndOfWord
+        INY                     ; If we have not reached the end of the word
+        LDA     (N),Y           ; yet, skip ahead so we can try the next word.
+        BPL     skipToEndOfWord
+.atEndOfWord
+        INY                     ; Load the contents of the LFA that follows
+        LDA     (N),Y           ; the name and store that as a pointer to the
+        TAX                     ; next word to try, in the scratch area N .
         INY
         LDA     (N),Y
         STA     N+1
         STX     N
-        ORA     N
-        BNE     L8361
-        LDX     XSAVE
+        ORA     N               ; If the LFA contains all zeroes, we've reached
+        BNE     compareName     ; the end of the dictionary and PUSH a false
+        LDX     XSAVE           ; flag to indicate the word was not found.
         LDA     #0
         PHA
         JMP     PUSH
+}
 
 ; -----------------------------------------------------------------------------
 ;

@@ -3045,7 +3045,7 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 ;
 ;       : COMPILE
 ;        ?COMP
-;        R>    DUP 2+ >R
+;        R>   DUP 2+   >R
 ;        @ ,
 ;       ;
 ;
@@ -4075,7 +4075,28 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         EQUW    COMMA
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       [COMPILE]
+;
+;       > Used in the creation of a colon-definition to force the compilation
+;       > of an IMMEDIATE word which would otherwise execute. The most
+;       > frequent use is with vocabulary words for example.
+;       >
+;       > [COMPILE] FORTH
+;       >
+;       > to delay the change of the CONTEXT vocabulary to FORTH until the word
+;       > containing the above sequence executes.
+;
+;       : [COMPILE]
+;        CONTEXT @ @
+;        -FIND
+;        0=  0 ?ERROR
+;        DROP
+;        ,
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .BCOMP_NFA
         DEFIMM  "[COMPILE]"
@@ -5839,7 +5860,20 @@ ENDIF
         EQUW    FETCHEXECUTE
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       ASSIGN
+;
+;       > Used in the form:
+;       >
+;       > ASSIGN NNNN TO-DO CCCC
+;
+;       > It causes all uses of the vectored word NNNN to execute CCCC. The
+;       > word NNNN must previously have been defined using EXVEC: .
+;
+;       : ASSIGN ' ;
+;
+; -----------------------------------------------------------------------------
 
 .ASSIGN_NFA
         DEFIMM  "ASSIGN"
@@ -5859,6 +5893,7 @@ ENDIF
 ;       : DOVEC
 ;        CFA SWAP !
 ;       ;
+;
 ; -----------------------------------------------------------------------------
 
 .DOVEC_NFA
@@ -5870,7 +5905,21 @@ ENDIF
         EQUW    STORE
         EQUW    EXIT
 
-;       TO-DO
+; -----------------------------------------------------------------------------
+;
+;       TO-DO   ( addr ... )
+;
+;       > Accepts a name from the input stream and stores its code field
+;       > (execution) address at addr. Used in the assignment of execution
+;       > vectors. See ASSIGN .
+;
+;       : TO-DO
+;        ' STATE @ IF
+;         COMPILE DOVEC
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .TODO_NFA
         DEFIMM  "TO-DO"

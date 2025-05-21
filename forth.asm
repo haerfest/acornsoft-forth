@@ -1572,19 +1572,26 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 .L8671  STY     0,X
         JMP     NEXT
 
-;       0<
+; -----------------------------------------------------------------------------
+;
+;       0<   ( n ... f )
+;
+;       > Leaves a true flag if n is less than zero, otherwise leaves a false
+;       > flag.
+;
+; -----------------------------------------------------------------------------
 
 .ZEROLESS_NFA
         DEFWORD "0<"
         EQUW    ZEROEQUAL_NFA
 .ZEROLESS
         EQUW    *+2
-        ASL     1,X
-        TYA
-        ROL     A
-        STY     1,X
-        STA     0,X
-        JMP     NEXT
+        ASL     1,X             ; Shift the high bit of n, which is on the
+        TYA                     ; stack, to the carry flag. Then rotate the
+        ROL     A               ; carry in the low bit of the accumulator.
+        STY     1,X             ; With the accumulator now either zero or one,
+        STA     0,X             ; overwrite n on the stack with this false or
+        JMP     NEXT            ; true flag.
 
 ;       <
 
@@ -5544,7 +5551,8 @@ ENDIF
 ;
 ;       : BEGIN
 ;        ?COMP
-;        HERE 1
+;        HERE
+;        1
 ;       ;
 ;       IMMEDIATE
 ;
@@ -8254,11 +8262,26 @@ RelocationSize = *-RelocationSource
         EQUW    DOMOP
         EQUB    $20,$84,4
 
-;       >BRANGE
+; -----------------------------------------------------------------------------
+;
+;       >BRANGE   ( offset ... offset )
+;
+;       Checks whether an offset is a valid range for a branch-forward
+;       instruction. It must lie in the range [0, 127].
+;
+;       : >BRANGE
+;        DUP 0<         ( check if offset is negative )
+;        OVER 127 >     ( or if it's larger than 127 )
+;        OR 13 ?ERROR   ( error: Branch Too Long )
+;       ;
+;
+; -----------------------------------------------------------------------------
 
-.LA9A2  DEFWORD ">BRANGE"
+.TOBRANGE_NFA
+        DEFWORD ">BRANGE"
         EQUW    LA996
-.LA9AC  EQUW    DOCOLON
+.TOBRANGE
+        EQUW    DOCOLON
         EQUW    DUP
         EQUW    ZEROLESS
         EQUW    OVER
@@ -8272,7 +8295,7 @@ RelocationSize = *-RelocationSource
 ;       <BRANGE
 
 .LA9C4  DEFWORD "<BRANGE"
-        EQUW    LA9A2
+        EQUW    TOBRANGE_NFA
 .LA9CE  EQUW    DOCOLON
         EQUW    DUP
         EQUW    ZEROGREATER
@@ -8291,14 +8314,30 @@ RelocationSize = *-RelocationSource
 .LA9EB  EQUW    DOCONSTANT
         EQUW    $10
 
-;       VS
+; -----------------------------------------------------------------------------
+;
+;       VS   ( ... $50 )
+;
+;       Pushes the opcode BVC onto the stack.
+;
+;       HEX 50 CONSTANT VS
+;
+; -----------------------------------------------------------------------------
 
 .LA9EF  DEFWORD "VS"
         EQUW    LA9E6
 .LA9F4  EQUW    DOCONSTANT
         EQUW    $50
 
-;       CS
+; -----------------------------------------------------------------------------
+;
+;       CS   ( ... $90 )
+;
+;       Pushes the opcode BCC onto the stack.
+;
+;       HEX 90 CONSTANT CS
+;
+; -----------------------------------------------------------------------------
 
 .LA9F8  DEFWORD "CS"
         EQUW    LA9EF
@@ -8321,7 +8360,18 @@ RelocationSize = *-RelocationSource
         EQUW    PLUS
         EQUW    EXIT
 
-;       IF,
+; -----------------------------------------------------------------------------
+;
+;       IF,   ( opcode ... addr 2 )
+;
+;       : IF,
+;        C,     ( store the branch opcode that's on the stack )
+;        HERE   ( remember where to fix the relative branch offset later )
+;        0 C,   ( store relative branch offset as zero for now ) 
+;        2
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .AIF_NFA
         DEFWORD "IF,"
@@ -8334,7 +8384,24 @@ RelocationSize = *-RelocationSource
         EQUW    TWO
         EQUW    EXIT
 
-;       THEN,
+; -----------------------------------------------------------------------------
+;
+;       THEN,   ( addr 2 ... )
+;
+;       : THEN,
+;        ?EXEC
+;        2 ?PAIRS
+;        HERE
+;        OVER C@ IF   ( if the branch offset is filled in )
+;         SWAP !      ( ??? )
+;        ELSE
+;         OVER 1+ -   ( calculate branch offset to here )
+;         >BRANGE     ( check if it's a valid forward-branch offset )
+;         SWAP C!     ( patch the branch offset following the opcode )
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .ATHEN_NFA
         DEFWORD "THEN,"
@@ -8353,7 +8420,7 @@ RelocationSize = *-RelocationSource
         EQUW    OVER
         EQUW    ONEPLUS
         EQUW    MINUS
-        EQUW    LA9AC
+        EQUW    TOBRANGE
         EQUW    SWAP
         EQUW    CSTORE
         EQUW    EXIT
@@ -8375,7 +8442,7 @@ RelocationSize = *-RelocationSource
         EQUW    OVER
         EQUW    ONEPLUS
         EQUW    MINUS
-        EQUW    LA9AC
+        EQUW    TOBRANGE
         EQUW    SWAP
         EQUW    CSTORE
         EQUW    TWO
@@ -8446,7 +8513,7 @@ RelocationSize = *-RelocationSource
         EQUW    TWOPLUS
         EQUW    OVER
         EQUW    MINUS
-        EQUW    LA9AC
+        EQUW    TOBRANGE
         EQUW    SWAP
         EQUW    CSTORE
         EQUW    AAGAIN

@@ -4012,6 +4012,52 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 ;
 ;       > See CREATE .
 ;
+;       : (CREATE)
+;        FIRST                             ( first mass storage buffer )
+;        HERE 160 +  U<  2 ?ERROR          ( if too close: dictionary full )
+;        BL WORD                           ( find input word )
+;        DUP C@                            ( access length byte )
+;        DUP 0=  10 ?ERROR                 ( if zero: redefine end of line )
+;        OVER CONTEXT @ @                  ( check if word already defined )
+;        (FIND) IF
+;         DROP
+;         2+ NFA                           ( CFA to PFA to NFA )
+;         ID.  4 MESSAGE                   ( warning: isn't unique )
+;         SPACE
+;        THEN
+;        WIDTH @ MIN                       ( limit the name's length )
+;        DUP  DP C@  +                     ( calculate LFA-1 )
+;        &FC =                             ( if xxFC then CFA at xxFF )
+;        ALLOT                             ( if so, advance DP one byte )
+;        1+                                ( add the length byte )
+;        DUP >R
+;        HERE SWAP CMOVE                   ( fill length + NFA )
+;        HERE                              ( remember start of word )
+;        R> ALLOT                          ( advance DP to LFA )
+;        DUP      &80 TOGGLE               ( set high bit of flag byte )
+;        HERE 1-  &80 TOGGLE               ( idem for last char of name )
+;        LAST ,                            ( set LFA to previous word )
+;        CURRENT @ !                       ( start of word to current )
+;        DOVARIABLE ,                      ( CFA points to variable code )
+;       ;
+;
+;       Note that this word works around a 6502 bug with an indirect jump
+;       starting at the last byte of a page, as in:
+;
+;        JMP  (&nnFF)
+;
+;       This does not retrieve the high byte from the first byte of the next
+;       page (&mm00 with mm = nn + 1) but instead from the first byte of the
+;       same page (&nn00).
+;
+;       It checks whether the new word's name added to the dictionary pointer
+;       DP, would end in &nnFC. If so, then the word's LFA would start at
+;       &nnFD (as the name is prefixed by a single flag/length byte) and thus
+;       the CFA at the perilous &nnFF.
+;
+;       In that case it advances the dictionary pointer by one byte to prevent
+;       running into this 6502 bug.
+;
 ; -----------------------------------------------------------------------------
 
 .BRACKETCREATE_NFA
@@ -4120,7 +4166,18 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         EQUW    COMMA
         EQUW    EXIT
 
+; -----------------------------------------------------------------------------
+;
 ;       LITERAL
+;
+;       : LITERAL
+;        STATE @  IF
+;         COMPILE LIT
+;         ,
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .LITERAL_NFA
         DEFIMM  "LITERAL"

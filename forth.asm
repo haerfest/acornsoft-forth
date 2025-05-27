@@ -3212,6 +3212,12 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 ;       > dictionary entries using them. This is, in a sense, a machine-code
 ;       > version of DOES> .
 ;
+;       : (;CODE)
+;        R>                 ( read IP from stack )
+;        LAST  PFA  CFA     ( get CFA of last defined word )
+;        !                  ( store IP in CFA )
+;       ;
+;
 ; -----------------------------------------------------------------------------
 
 .BRACKETSEMICOLONCODE_NFA
@@ -4285,7 +4291,44 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         EQUW    SMUDG
         EQUW    EXIT
 
-;       NUMBER
+; -----------------------------------------------------------------------------
+;
+;       NUMBER   ( addr ... nd )
+;
+;       > Converts the character string starting with a character count byte at
+;       > the address addr to the signed double number nd using the current
+;       > numeric base. If a valid numeric conversion is not possible an error
+;       > message will be given. The string may contain a leading negative sign
+;       > and a trailing decimal point. The decimal point is ignored by NUMBER
+;       > .
+;
+;       : NUMBER
+;        DUP C@             ( fetch length byte )
+;        OVER +             ( calculate end of string address )
+;        >R                 ( save on return stack )
+;        0 0 ROT            ( rotate to: 0 0 addr )
+;        DUP 1+ C@          ( fetch the first character )
+;        [ ASCII - ] =      ( check if it's a minus sign )
+;        DUP >R             ( save the minus flag on the return stack )
+;        +                  ( skip the minus sign when present: 0 0 addr )
+;        CONVERT            ( convert the digits to a double number )
+;        R> IF              ( check whether it was a negative number )
+;         >R                ( save end address )
+;         DNEGATE           ( negate the double number )
+;         R>                ( restore end address )
+;        THEN
+;        R>                 ( retrieve end of string address )
+;        OVER -             ( subtract how far we got parsing )
+;        DUP 0< IF          ( if we parsed beyond the input )
+;         2DROP             ( then leave just the number )
+;        ELSE
+;         0 ?ERROR          ( error if we have input left )
+;         C@ [ ASCII . ] -  ( check if last character is a dot )
+;         0 ?ERROR          ( error if not a dot )
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .NUMBER_NFA
         DEFWORD "NUMBER"
@@ -4344,7 +4387,26 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         EQUW    DROP
         EQUW    EXIT
 
-;       (NUM)
+; -----------------------------------------------------------------------------
+;
+;       (NUM)   ( addr ... )
+;
+;       > See NUM .
+;
+;       : (NUM)
+;        DUP C@ OVER + SWAP
+;        NUMBER
+;        ROT
+;        C@ [ ASCII . ] -
+;        IF
+;         DROP
+;         LITERAL
+;        ELSE
+;         DLITERAL
+;        THEN
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .BRACKETNUM_NFA
         DEFWORD "(NUM)"
@@ -4385,12 +4447,13 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
 ;
 ;       : INTERPRET
 ;        CONTEXT @ @
-;        -FIND IF
-;         STATE @ < IF
-;          ,
+;        -FIND IF          ( if the word was found in the current context )
+;         STATE @ < IF     ( if compiling )
+;          ,               ( store the address of the word at HERE )
 ;         ELSE
-;          EXECUTE
+;          EXECUTE         ( if not compiling, execute the word )
 ;         THEN
+;        ELSE
 ;         WBFR
 ;         NUM
 ;         ?STACK
@@ -6938,7 +7001,24 @@ LIMIT = XLIMI-RelocationOffset
 
 CREATE = XCREATE-RelocationOffset
 
-;       NUM
+; -----------------------------------------------------------------------------
+;
+;       NUM   ( addr ... )      ( compiling )
+;             ( addr ... n )    ( executing )
+;             ( addr ... nd )   ( executing )
+;
+;       > A vectored routine initialised on a cold start to execute (NUM) . It
+;       > is used in INTERPRET for number conversion. In the compiling state the
+;       > number is compiled into the dictionary but in execution mode the
+;       > number is left on the stack.
+;       >
+;       > In both cases addr is the address of the count byte of a string to be
+;       > converted to a number. The string may contain a leading minus sign and
+;       > a trailing decimal point. If the decimal point is present a double-
+;       > precision number results otherwise a single-precision number is
+;       > produced.
+;
+; -----------------------------------------------------------------------------
 
 .XNUM_NFA
         DEFWORD "NUM"

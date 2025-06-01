@@ -3848,7 +3848,33 @@ FirstBlockBuffer       = EndOfMemory-TotalBlockBufferSize
         EQUW    CSTORE
         EQUW    EXIT
 
-;       CONVERT
+; -----------------------------------------------------------------------------
+;
+;       CONVERT   ( nd1\addr1 ... nd2\addr2 )
+;
+;       > Converts the text beginning at the address addr1 to the equivalent
+;       > stack number. The value is accumulated into double number nd1, with
+;       > regard to the current numeric base, being left as nd2. The address of
+;       > the first non-convertible character is left in addr2.
+;
+;       : CONVERT
+;        BEGIN
+;         1+                 ( move to the next digit, skip the length byte )
+;         DUP >R             ( save the address )
+;         C@  BASE @  DIGIT  ( fetch a character and convert per base )
+;         IF                 ( if the conversion was successful )
+;          SWAP              ( swap number and high word of accumulated value )
+;          BASE @  U*  DROP  ( multiply high word of accumulator by base )
+;          ROT               ( bring low word of accumulator up )
+;          BASE @  U*        ( multiply low word of accumulator by base )
+;          D+                ( add number to accumulator )
+;          R>                ( restore the address )
+;          AGAIN             ( continue with the next digit )
+;         THEN
+;         R>                 ( restore the address )
+;       ;
+;
+; -----------------------------------------------------------------------------
 
 .CONV_NFA
         DEFWORD "CONVERT"
